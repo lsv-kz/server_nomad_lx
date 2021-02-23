@@ -26,7 +26,7 @@ now = datetime.datetime.utcnow()
 print("""</table>
 <form action=\"env.py\" method=\"%s\">
 <input type=\"hidden\" name=\"name\" value=\".-./. .+.!.?.,.~.#.&.>.<.^.\">
-<p><input type=\"submit\" value=\"Get \$ENV\"></p>
+<p><input type=\"submit\" value=\"Get ENV\"></p>
 </form>
 </center>
 <hr>

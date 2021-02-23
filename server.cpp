@@ -7,7 +7,6 @@ int sockServer;
 int Connect::serverSocket;
 int create_server_socket(const Config *c);
 void read_conf_file(const char *path_conf);
-
 //======================================================================
 static void signal_handler(int sig)
 {

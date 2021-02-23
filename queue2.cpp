@@ -85,7 +85,6 @@ void queue2(RequestManager *ReqMan)
         }
 
         ret = poll(fdrd, count_resp, timeout); 
-
         if (ret == -1)
         {
             print_err("<%s:%d> Error poll(): %s\n", __func__, __LINE__, strerror(errno));
@@ -127,7 +126,7 @@ void queue2(RequestManager *ReqMan)
             }
         }
     }
-    
+
     print_err("[%d]<%s:%d> *** Exit queue2() ***\n", num_chld, __func__, __LINE__);
     delete [] fdrd;
 }
