@@ -1,11 +1,8 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 import os, datetime 
 import cgi
 import codecs,sys
-
-#sys.stdout = codecs.getwriter('utf8')(sys.stdout) #  не работает
 
 sys.stdout = codecs.getwriter("utf-8")(sys.stdout.detach(), errors='replace')
 form = cgi.FieldStorage()
@@ -22,11 +19,11 @@ print("""<!DOCTYPE HTML>
 <html>
   <head>
    <meta charset="utf-8">
-   <title>Обработка данных форм</title>
+   <title>Test Form</title>
   </head>
   <body>
    <meta charset=\"utf-8\">""")
-print("   <h3>","Здравствуйте ",text1,' ', text2, "!</h3>")
+print("   <h3>","Hello ",text1,' ', text2, "!</h3>")
 print("   <p>   len=%d</p>"%len(text1))
 print("""   <form action=\"/cgi-bin/python/submit.py\" method=\"%s\" >
     <input type=\"text\" name=\"TEXT_1\" value=\"\">
