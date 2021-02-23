@@ -99,9 +99,6 @@ int main(int argc, char *argv[])
          << "\n   ClientMaxBodySize = " << conf->ClientMaxBodySize
          << "\n\n";
 
-    cout << "  sizeof off_t = " << sizeof(off_t) << "; sizeof int = " << sizeof(int) << "\n";
-    cout << "  sizeof size_t = " << sizeof(size_t) << "\n";
-
     cerr << "  uid=" << getuid() << "; gid=" << getgid() << "\n\n";
     cout << "  uid=" << getuid() << "; gid=" << getgid() << "\n\n";
 	//------------------------------------------------------------------
