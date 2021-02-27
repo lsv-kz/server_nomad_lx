@@ -1,6 +1,6 @@
 #ifndef CLASS_STRING_H_
 #define CLASS_STRING_H_
-#include <iostream>
+
 #include <cstring>
 
 //======================================================================
@@ -243,9 +243,7 @@ public:
     //------------------------------------------------------------------
     void append(const char *s, unsigned int n)
     {
-        if (err) return;
-        unsigned int len = strlen(s);
-        if (n > len) n = len;
+        if (!s || err) return;
         if ((lenBuf + n) >= sizeBuf)
         {
             reserve(lenBuf + n + 1 + add);
@@ -297,26 +295,28 @@ public:
             if (p_ >= lenBuf) break;
         }
         
-        *(ptr + lenBuf) = 0;
-        
         char *p1 = (char*)memchr(ptr + p_, ' ', lenBuf - p_);
-        char *p2 = (char*)memchr(ptr + p_, '\r', lenBuf - p_);
-        char *p3 = (char*)memchr(ptr + p_, '\n', lenBuf - p_);
+        char *p2 = (char*)memchr(ptr + p_, '\t', lenBuf - p_);
+        char *p3 = (char*)memchr(ptr + p_, '\r', lenBuf - p_);
+        char *p4 = (char*)memchr(ptr + p_, '\n', lenBuf - p_);
         
-        char *p4 = ptr + lenBuf;
+        char *p5 = ptr + lenBuf;
         
-        if (!p1) p1 = p4;
-        if (!p2) p2 = p4;
-        if (!p3) p3 = p4;
+        if (!p1) p1 = p5;
+        if (!p2) p2 = p5;
+        if (!p3) p3 = p5;
+        if (!p4) p4 = p5;
         
-        if ((p1 < p2) && (p1 < p3))
+        if ((p1 < p2) && (p1 < p3) && (p1 < p4))
             return p1;
-        else if ((p2 < p1) && (p2 < p3))
+        else if ((p2 < p1) && (p2 < p3) && (p2 < p4))
             return p2;
-        else if ((p3 < p1) && (p3 < p2))
+        else if ((p3 < p1) && (p3 < p2) && (p3 < p4))
             return p3;
-        else
+        else if ((p4 < p1) && (p4 < p2) && (p4 < p3))
             return p4;
+        else
+            return p5;
     }
     
     String & operator >> (String & s)

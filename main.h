@@ -19,18 +19,10 @@
 #include <signal.h>
 #include <unistd.h>
 
-#include <sys/select.h>
-#include <sys/socket.h>
 #include <sys/stat.h>
 #include <sys/time.h>
 #include <sys/wait.h>
 #include <poll.h>
-
-#include <arpa/inet.h>
-#include <netinet/tcp.h>
-#include <netinet/in.h>
-#include <netdb.h>
- 
 #include <sys/ioctl.h>
 #include <dirent.h>
 #include <fcntl.h>
@@ -39,11 +31,17 @@
 #include <pthread.h>
 #include <sys/resource.h>
 
+#include <sys/socket.h>
+#include <arpa/inet.h>
+#include <netinet/tcp.h>
+#include <netinet/in.h>
+#include <netdb.h>
+
 #include "String.h"
 
 #define     MAX_PATH          2048
 #define     MAX_NAME           256
-#define     LEN_BUF_REQUEST   8192 // 4096 16284 32768 
+#define     LEN_BUF_REQUEST   8192
 #define     NUM_HEADERS         25
 
 typedef struct fcgi_list_addr {
@@ -280,7 +278,6 @@ int send_largefile(Connect *req, char *buf, int size, off_t offset, long long *c
 
 int read_headers(Connect *req, int timeout1, int timeout2);
 //----------------------------------------------------------------------
-void get_time_run(int a, int b, struct timeval *time1, struct timeval *time2);
 void send_message(Connect *req, const char *msg, String *);
 int send_response_headers(Connect *req, String *hdrs);
 //----------------------------------------------------------------------
