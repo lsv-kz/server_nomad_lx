@@ -269,7 +269,7 @@ int client_to_fcgi(int sock_cl, int fcgi_sock, int contentLength)
     return 0;
 }
 //======================================================================
-int fcgi_get_header(int fcgi_sock, fcgi_header *header)
+int fcgi_read_header(int fcgi_sock, fcgi_header *header)
 {
     int n;
     char buf[8];
@@ -348,7 +348,7 @@ int fcgi_chunk(Connect *req, String *hdrs, int fcgi_sock, fcgi_header *header, c
     //------------------- send entity other parts ----------------------
     while(1)
     {
-        ret = fcgi_get_header(fcgi_sock, header);
+        ret = fcgi_read_header(fcgi_sock, header);
         if (ret <= 0)
         {
             print_err(req, "<%s:%d> fcgi_get_header()=%d\n", __func__, __LINE__, ret);
@@ -444,7 +444,7 @@ int fcgi_read_headers(Connect *req, int fcgi_sock)
     const char *err_str = NULL;
     while (1)
     {
-        n = fcgi_get_header(fcgi_sock, &header);
+        n = fcgi_read_header(fcgi_sock, &header);
         if (n <= 0)
         {
 print_err(req, "<%s:%d> fcgi_get_header()=%d\n", __func__, __LINE__, n);
