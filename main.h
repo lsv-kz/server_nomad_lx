@@ -299,10 +299,6 @@ const char *base_name(const char *path);
 int parse_startline_request(Connect *req, char *s, int len);
 int parse_headers(Connect *req, char *s, int len);
 const char *str_err(int i);
-
-void hex_dump_stderr(const char *s, int line, const void *p, int n);
-
-int find_empty_str(char *s);
 //----------------------------------------------------------------------
 void create_logfiles(const String &, const String &);
 void close_logs(void);

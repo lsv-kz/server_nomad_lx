@@ -386,7 +386,7 @@ int fcgi_read_stderr(int fd_in, int cont_len, int timeout)
         }
         else if (rd == 0)
             break;
-hex_dump_stderr(__func__, __LINE__, buf, rd);
+
         cont_len -= rd;
 
         write(STDERR_FILENO, buf, rd);
