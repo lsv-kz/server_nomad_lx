@@ -5,6 +5,7 @@ CC = c++
 #CC = clang++-3.9
 
 OBJSDIR = objs
+$(shell mkdir -p $(OBJSDIR))
 
 OBJS = $(OBJSDIR)/server.o \
 	$(OBJSDIR)/queue2.o \
