@@ -307,14 +307,15 @@ long fcgi_to_cosmos(int fd_in, unsigned int size, int timeout)
     return wr_bytes;
 }
 //======================================================================
-int fcgi_read_padding(int fd_in, long len, int timeout)
+int fcgi_read_padding(int fd_in, unsigned char len, int timeout)
 {
     int rd;
-    char buf[1024];
+    const unsigned int size = 256;
+    char buf[size];
 
     for (; len > 0; )
     {
-        rd = read_timeout(fd_in, buf, (len > (int)sizeof(buf)) ? (int)sizeof(buf) : len, timeout);
+        rd = read_timeout(fd_in, buf, (len > size) ? size : len, timeout);
         if (rd == -1)
         {
             if (errno == EINTR)

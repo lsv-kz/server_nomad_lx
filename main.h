@@ -271,7 +271,7 @@ long fcgi_to_cosmos(int fd_in, unsigned int size, int timeout);
 
 int script_to_file(int fd_in, int fd_out, int cont_len, int timeout);
 
-int fcgi_read_padding(int fd, long len, int timeout);
+int fcgi_read_padding(int fd, unsigned char len, int timeout);
 int fcgi_read_stderr(int fd, int cont_len, int timeout);
 
 int send_largefile(Connect *req, char *buf, int size, off_t offset, long long *cont_len);
