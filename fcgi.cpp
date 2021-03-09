@@ -1,155 +1,8 @@
 #include "classes.h"
+#include "fcgi.h"
 
 using namespace std;
 
-#define FCGI_RESPONDER  1
-//#define FCGI_AUTHORIZER 2
-//#define FCGI_FILTER     3
-
-//#define FCGI_KEEP_CONN  1
-
-#define FCGI_VERSION_1           1
-#define FCGI_BEGIN_REQUEST       1
-#define FCGI_ABORT_REQUEST       2
-#define FCGI_END_REQUEST         3
-#define FCGI_PARAMS              4
-#define FCGI_STDIN               5
-#define FCGI_STDOUT              6
-#define FCGI_STDERR              7
-#define FCGI_DATA                8
-#define FCGI_GET_VALUES          9
-#define FCGI_GET_VALUES_RESULT  10
-#define FCGI_UNKNOWN_TYPE       11
-#define FCGI_MAXTYPE (FCGI_UNKNOWN_TYPE)
-
-typedef struct {
-    unsigned char type;
-    int len;
-    int paddingLen;
-} fcgi_header;
-
-const int requestId = 1;
-//======================================================================
-const int FCGI_SIZE_PAR_BUF = 4088;
-const int FCGI_SIZE_HEADER = 8;
-
-class FCGI_params
-{
-    char buf[FCGI_SIZE_HEADER + FCGI_SIZE_PAR_BUF];
-    int lenBuf = 0;
-    int err = 0;
-    int numPar = 0;
-    int fcgi_sock;
-    char *ptrPar = buf + FCGI_SIZE_HEADER;
-    
-    void send_par(int end)
-    {
-        if (err) return;
-        unsigned char padding = 8 - (lenBuf % 8);
-        padding = (padding == 8) ? 0 : padding;
-        char *p = buf;
-        *p++ = FCGI_VERSION_1;
-        *p++ = FCGI_PARAMS;
-        *p++ = (unsigned char) ((1 >> 8) & 0xff);
-        *p++ = (unsigned char) ((1) & 0xff);
-    
-        *p++ = (unsigned char) ((lenBuf >> 8) & 0xff);
-        *p++ = (unsigned char) ((lenBuf) & 0xff);
-    
-        *p++ = padding;
-        *p = 0;
-
-        memset(ptrPar + lenBuf, 0, padding);
-        lenBuf += padding;
-        
-        if (end && ((lenBuf + 8) <= FCGI_SIZE_PAR_BUF))
-        {
-            char s[8] = {1, 4, 0, 1, 0, 0, 0, 0};
-            memcpy(ptrPar + lenBuf, s, 8);
-            lenBuf += 8;
-            end = 0;
-        }
- 
-        int n = write_to_script(fcgi_sock, buf, 8 + lenBuf, conf->TimeoutCGI);
-        if (n == -1)
-        {
-            err = 1;
-            return;
-        }
-    
-        lenBuf = 0;
-        if (end)
-            send_par(0);
-    }
-    
-    FCGI_params() {}
-public:
-    FCGI_params(int s) { fcgi_sock = s; }
-    
-    void add(const char *name, const char *val)
-    {
-        if (err) return;
-        ++numPar;
-        if (!name)
-        {
-            send_par(1);
-            return;
-        }
-
-        size_t len_name = strlen(name), len_val, len;
-        
-        if (val)
-            len_val = strlen(val);
-        else
-            len_val = 0;
-        
-        len = len_name + len_val;
-        len += len_name > 127 ? 4 : 1;
-        len += len_val > 127 ? 4 : 1;
-        
-        if ((lenBuf + len + 8) > FCGI_SIZE_PAR_BUF)
-        {
-            send_par(0);
-            if (err)
-                return;
-            if ((len + 8) > FCGI_SIZE_PAR_BUF)
-            {
-                cerr << "[" << name << "  " << val << "] len=" << len <<  "\n";
-                err = 1;
-                return;
-            }
-        }
-        
-        char *p = ptrPar + lenBuf;
-        if (len_name < 0x80)
-            *p++ = (unsigned char)len_name;
-        else
-        {
-            *p++ = (unsigned char)((len_name >> 24) | 0x80);
-            *p++ = (unsigned char)(len_name >> 16);
-            *p++ = (unsigned char)(len_name >> 8);
-            *p++ = (unsigned char)len_name;
-        }
-    
-        if (len_val < 0x80)
-            *p++ = (unsigned char)len_val;
-        else
-        {
-            *p++ = (unsigned char)((len_val >> 24) | 0x80);
-            *p++ = (unsigned char)(len_val >> 16);
-            *p++ = (unsigned char)(len_val >> 8);
-            *p++ = (unsigned char)len_val;
-        }
-        
-        memcpy(p, name, len_name);
-        if (len_val > 0)
-            memcpy(p + len_name, val, len_val);
-        
-        lenBuf += len;
-    }
-    
-    int error() { return err; }
-};
 //======================================================================
 int get_sock_fcgi(Connect *req, const char *script)
 {
@@ -193,91 +46,14 @@ int get_sock_fcgi(Connect *req, const char *script)
     return fcgi_sock;
 }
 //======================================================================
-void fcgi_set_header(char *header, int type, int id, int len, int padding_len)
-{
-    char *p = header;
-    *p++ = FCGI_VERSION_1;                      // Protocol Version
-    *p++ = type;                                // PDU Type
-    *p++ = (unsigned char) ((id >> 8) & 0xff);  // Request Id
-    *p++ = (unsigned char) ((id) & 0xff);       // Request Id
-    
-    *p++ = (unsigned char) ((len >> 8) & 0xff); // Content Length
-    *p++ = (unsigned char) ((len) & 0xff);      // Content Length
-    
-    *p++ = padding_len;                         // Padding Length
-    *p = 0;                                     // Reserved
-}
-//======================================================================
-int tail_to_fcgi(int fcgi_sock, char *tail, int lenTail)
-{
-    int rd, wr, all_wr = 0;
-    const int size_buf = 8192;
-    char buf[16 + size_buf], *p = tail;
-
-    while(lenTail > 0)
-    {
-        if (lenTail > size_buf)
-            rd = size_buf;
-        else
-            rd = lenTail;
-        memcpy(buf + 8, p, rd);
-        
-        size_t padding = 8 - (rd % 8);
-        padding = (padding == 8) ? 0 : padding;
-        fcgi_set_header(buf, FCGI_STDIN, requestId, rd, padding);
-//hex_dump_stderr(__func__, __LINE__, buf, rd + 8 + padding);
-        wr = write_to_script(fcgi_sock, buf, rd + 8 + padding, conf->TimeoutCGI);
-        if ((wr == -1) || ((rd + 8 + (int)padding) != wr))
-        {
-            return -1;
-        }
-        lenTail -= rd;
-        all_wr += rd;
-        p += rd;
-    }
-    return all_wr;
-}
-//======================================================================
-int client_to_fcgi(int sock_cl, int fcgi_sock, int contentLength)
-{
-    int rd, wr;
-    const int size_buf = 8192;
-    char buf[16 + size_buf];
-    
-    while(contentLength > 0)
-    {
-        if (contentLength > size_buf)
-            rd = read_timeout(sock_cl, buf + 8, size_buf, conf->TimeOut);
-        else
-            rd = read_timeout(sock_cl, buf + 8, contentLength, conf->TimeOut);
-        if (rd <= 0)
-        {
-            return -1;
-        }
-
-        size_t padding = 8 - (rd % 8);
-        padding = (padding == 8) ? 0 : padding;
-        fcgi_set_header(buf, FCGI_STDIN, requestId, rd, padding);
-//hex_dump_stderr(__func__, __LINE__, buf, rd + 8 + padding);
-        wr = write_to_script(fcgi_sock, buf, rd + 8 + padding, conf->TimeoutCGI);
-        if (wr == -1)
-        {
-            return -1;
-        }
-        contentLength -= rd;
-    }
-    return 0;
-}
-//======================================================================
 int fcgi_read_header(int fcgi_sock, fcgi_header *header)
 {
     int n;
     char buf[8];
-    
     n = read_timeout(fcgi_sock, buf, 8, conf->TimeoutCGI);
     if (n <= 0)
-        return n;
-//hex_dump_stderr(__func__, __LINE__, buf, 8);
+        return -1;
+
     header->type = (unsigned char)buf[1];
     header->paddingLen = (unsigned char)buf[6];
     header->len = ((unsigned char)buf[4]<<8) | (unsigned char)buf[5];
@@ -285,9 +61,137 @@ int fcgi_read_header(int fcgi_sock, fcgi_header *header)
     return n;
 }
 //======================================================================
-int fcgi_chunk(Connect *req, String *hdrs, int fcgi_sock, fcgi_header *header, char *tail_ptr, int tail_len)
+int fcgi_set_header(char *p, int type, int len, int make_padd)
 {
-    int ret;
+    unsigned char padding = 0;
+    if (make_padd)
+    {
+        padding = 8 - (len % 8);
+        padding = (padding == 8) ? 0 : padding;
+    }
+
+    *p++ = FCGI_VERSION_1;
+    *p++ = (unsigned char)type;
+    *p++ = (unsigned char) ((1 >> 8) & 0xff);
+    *p++ = (unsigned char) ((1) & 0xff);
+    
+    *p++ = (unsigned char) ((len >> 8) & 0xff);
+    *p++ = (unsigned char) ((len) & 0xff);
+    
+    *p++ = padding;
+    *p = 0;
+    return padding;
+}
+//======================================================================
+int fcgi_read_headers(char *s, int len, String *hdrs, int *stat)
+{
+    char *start_ptr = s;
+    int i = len;
+//hex_dump_stderr(__func__, __LINE__, s, len);
+    while (1)
+    {
+        char *end_ptr;
+        if (i <= 0)
+        {
+            printf("<%s:%d> i = %d\n", __func__, __LINE__, i);
+            return -1;
+        }
+        end_ptr = (char*)memchr(start_ptr, '\n', i);
+        if (end_ptr)
+        {
+            int n = end_ptr - start_ptr + 1;
+            i -= n;
+            
+            if ((n > 1) && (*(end_ptr - 1) == '\r'))
+                n -= 2;
+            else if (n == 1)
+                --n;
+            
+            if (n == 0)
+                break;
+            
+            if(!strncmp("Status", start_ptr, 6))
+            {
+                *(start_ptr + n) = 0;
+                *stat = atoi(start_ptr + 7);
+            }
+            else
+            {
+                hdrs->append(start_ptr, n);
+                *(hdrs) << "\r\n";
+            }
+            start_ptr = end_ptr + 1;
+        }
+        else
+        {
+            printf("<%s:%d> ----\n", __func__, __LINE__);
+            return -1;
+        }
+    }
+
+    return len - i;
+}
+//======================================================================
+int fcgi_(Connect *req, int fcgi_sock)
+{
+//print_err("<%s:%d> -------------------------\n", __func__, __LINE__);
+    if(req->reqMethod == M_POST)
+    {
+        if (req->tail)
+        {
+            char buf[8];
+
+            fcgi_set_header(buf, FCGI_STDIN, req->lenTail, 0);
+            if (write_to_script(fcgi_sock, buf, 8, conf->TimeoutCGI) < 0)
+                return -RS502;
+    
+            if (write_to_script(fcgi_sock, req->tail, req->lenTail, conf->TimeoutCGI) < 0)
+                return -RS502;
+            
+            req->req_hdrs.reqContentLength -= req->lenTail;
+        }
+
+        while (req->req_hdrs.reqContentLength > 0)
+        {
+            const int size_buf = 2048;
+            char buf[size_buf + 16];
+            int rd = (req->req_hdrs.reqContentLength > size_buf) ? size_buf : (int)req->req_hdrs.reqContentLength;
+            int ret = read_timeout(req->clientSocket, buf + 8, rd, conf->TimeOut);
+            if (ret < 0)
+            {
+                print_err(req, "<%s:%d> Error: reaf_from_client()\n", __func__, __LINE__);
+                return ret;
+            }
+
+            req->req_hdrs.reqContentLength -= rd;
+            
+            size_t padding = fcgi_set_header(buf, FCGI_STDIN, rd, 1);
+            ret = write_to_script(fcgi_sock, buf, rd + 8 + padding, conf->TimeoutCGI);
+            if (ret <= 0)
+            {
+                print_err(req, "<%s:%d> Error: write_to_script()=%d\n", __func__, __LINE__, ret);
+                return -RS502;
+            }
+        }
+    }
+
+    // End FCGI_STDIN
+    char hd[8];
+    fcgi_set_header(hd, FCGI_STDIN, 0, 0);
+    int n;
+    if ((n = write_to_script(fcgi_sock, hd, 8, conf->TimeoutCGI)) <= 0)
+    {
+        print_err(req, "<%s:%d> Error: write_to_script()=%n\n", __func__, __LINE__, n);
+        return -RS502;
+    }
+
+    String hdrs(256);
+    if (hdrs.error())
+    {
+        printf("<%s:%d> Error create String object\n", __func__, __LINE__);
+        return -500;
+    }
+    
     int chunk_mode;
     if (req->reqMethod == M_HEAD)
         chunk_mode = NO_SEND;
@@ -295,127 +199,112 @@ int fcgi_chunk(Connect *req, String *hdrs, int fcgi_sock, fcgi_header *header, c
         chunk_mode = ((req->httpProt == HTTP11) && req->connKeepAlive) ? SEND_CHUNK : SEND_NO_CHUNK;
 
     ClChunked chunk(req, chunk_mode);
-//print_err(req, "<%s:%d> -------------\n", __func__, __LINE__);
-    req->resp.numPart = 0;
-
+    
     if (chunk_mode == SEND_CHUNK)
+        hdrs << "Transfer-Encoding: chunked\r\n";
+    
+    const int len_buf = 1024;
+    char buf[len_buf + 1];
+    char padd[256];
+    int empty_line = 0;
+    req->resp.respStatus = RS200;
+    fcgi_header header = {0, 0, 0};
+    
+    while (1)
     {
-        (*hdrs) << "Transfer-Encoding: chunked\r\n";
-    }
-
-    if (chunk_mode)
-    {
-        if (send_response_headers(req, hdrs))
+        if (header.len == 0)
         {
-            return -1;
+            int n = fcgi_read_header(fcgi_sock, &header);
+            if (n <= 0)
+                return -1;
         }
         
-        if (req->resp.respStatus == RS204)
+        if (header.type == FCGI_STDOUT)
         {
-            return 0;
-        }
-    }
-    //------------------- send entity after headers --------------------
-    if ((tail_len > 0) && tail_ptr)
-    {
-        ret = chunk.add_arr(tail_ptr, tail_len);
-        if (ret < 0)
-        {
-            print_err(req, "<%s:%d> Error chunk_buf.add_arr(): %d\n", __func__, __LINE__, ret);
-            return -RS500;
-        }
-    }
-
-    if (header->len > 0)
-    {
-        ret = chunk.fcgi_to_client(fcgi_sock, header->len);
-        if (ret < 0)
-        {
-            print_err(req, "<%s:%d> Error chunk.fcgi_to_client()=%d\n", __func__, __LINE__, ret);
-            return -1;
-        }
-    }
-
-    if (header->paddingLen > 0)
-    {
-        ret = fcgi_read_padding(fcgi_sock, header->paddingLen, conf->TimeoutCGI);
-        if (ret <= 0)
-        {
-            print_err(req, "<%s:%d> Error fcgi_read_padding()=%d\n", __func__, __LINE__, ret);
-            return -1;
-        }
-    }
-    //------------------- send entity other parts ----------------------
-    while(1)
-    {
-        ret = fcgi_read_header(fcgi_sock, header);
-        if (ret <= 0)
-        {
-            print_err(req, "<%s:%d> fcgi_get_header()=%d\n", __func__, __LINE__, ret);
-            return -RS500;
-        }
-
-        if (header->type == FCGI_END_REQUEST)
-        {
-            char buf[256];
-            ret = read_timeout(fcgi_sock, buf, header->len, conf->TimeoutCGI);
-            if (ret <= 0)
+            if (header.len == 0)
+                break;
+            int rd = (header.len <= len_buf) ? header.len : len_buf;
+            int n = read_timeout(fcgi_sock, buf, rd, conf->TimeoutCGI);
+            if (n <= 0)
             {
-                print_err(req, "<%s:%d> read_timeout()\n", __func__, __LINE__);
+                printf("! Error: fcgi_read FCGI_STDOUT\n");
                 return -1;
             }
-  //  hex_dump_stderr("fcgi_chunk: FCGI_END_REQUEST", __LINE__, buf, header->len);
+            
+            header.len -= n;
+            buf[n] = 0;
+            if (!empty_line)
+            {
+                int tail = fcgi_read_headers(buf, n, &hdrs, &req->resp.respStatus);
+                if (tail >= 0)
+                {
+                    if (chunk_mode)
+                    {
+                        if (req->resp.respStatus >= RS400)
+                            send_message(req, NULL, NULL);
+                        else if (send_response_headers(req, &hdrs))
+                            return -1;
+        
+                        if (req->resp.respStatus == RS204)
+                        {
+                            return 0;
+                        }
+                    }
+                    
+                    chunk.add_arr(buf + tail, n - tail);
+                }
+                else
+                    return -1;
+                empty_line = 1;
+            }
+            else
+                chunk.add_arr(buf, n);
+        }
+        else if (header.type == FCGI_END_REQUEST)
+        {
+            if (header.len > 8)
+                return -1;
+            int n = read_timeout(fcgi_sock, padd, header.len, conf->TimeoutCGI);
+            if (n > 0)
+                header.len -= n;
             break;
         }
-        else if (header->type == FCGI_STDERR)
+        else if (header.type == FCGI_STDERR)
         {
-            ret = fcgi_read_stderr(fcgi_sock, header->len, conf->TimeoutCGI);
+            int ret = fcgi_read_stderr(fcgi_sock, header.len, conf->TimeoutCGI);
             if (ret <= 0)
             {
                 print_err(req, "<%s:%d> Error fcgi_read_stderr()\n", __func__, __LINE__);
-                return -RS500;
-            }
-    
-            header->len -= ret;
-        }
-        else if (header->type == FCGI_STDOUT)
-        {
-//print_err("<%s:%d>  header.len=%d\n", __func__, __LINE__, header->len);
-            ret = chunk.fcgi_to_client(fcgi_sock, header->len);
-            if (ret < 0)
-            {
-                print_err(req, "<%s:%d> Error chunk.fcgi_to_client()=%d\n", __func__, __LINE__, ret);
                 return -1;
             }
+    
+            header.len -= ret;
         }
         else
         {
-            print_err(req, "<%s:%d> Error fcgi: type=%hhu\n", __func__, __LINE__, header->type);
+            printf("! Error: type=%d\n", header.type);
             return -1;
         }
         
-        if (header->paddingLen > 0)
+        if ((header.paddingLen > 0) && (header.len == 0))
         {
-            ret = fcgi_read_padding(fcgi_sock, header->paddingLen, conf->TimeoutCGI);
-            if (ret <= 0)
-            {
-                print_err(req, "<%s:%d> Error fcgi_read_padding()=%d\n", __func__, __LINE__, ret);
+            if (read_timeout(fcgi_sock, padd, header.paddingLen, conf->TimeoutCGI) <= 0)
                 return -1;
-            }
         }
     }
-    //------------------------------------------------------------------
-    ret = chunk.end();
+    
+    int ret = chunk.end();
     req->resp.respContentLength = chunk.all();
     if (ret < 0)
     {
         print_err(req, "<%s:%d> Error chunk.end(): %d\n", __func__, __LINE__, ret);
+        return -1;
     }
     
     if (chunk_mode == NO_SEND)
     {
 //print_err("<%s:%d> chunk.all() = %d\n", __func__, __LINE__, chunk.all());
-        if (send_response_headers(req, hdrs))
+        if (send_response_headers(req, &hdrs))
         {
             print_err("<%s:%d> Error send_header_response()\n", __func__, __LINE__);
             return -1;
@@ -423,305 +312,77 @@ int fcgi_chunk(Connect *req, String *hdrs, int fcgi_sock, fcgi_header *header, c
     }
     else
         req->resp.send_bytes = req->resp.respContentLength;
-    /*----------------------- end response -----------------------*/
+
     return 0;
 }
 //======================================================================
-int read_from_script(int cgi_serv_in, char *buf, int len);
-//======================================================================
-int fcgi_read_headers(Connect *req, int fcgi_sock)
+int fcgi_send_param(Connect *req, int fcgi_sock)
 {
-    int n;
-    fcgi_header header;
-//print_err(req, "<%s:%d> -------------\n", __func__, __LINE__);
-    req->resp.respStatus = RS200;
-    String hdrs(256);
-    if (hdrs.error())
-    {
-        print_err(req, "<%s:%d> Error create String object\n", __func__, __LINE__);
-        return -RS500;
-    }
-    const char *err_str = NULL;
-    while (1)
-    {
-        n = fcgi_read_header(fcgi_sock, &header);
-        if (n <= 0)
-        {
-print_err(req, "<%s:%d> fcgi_get_header()=%d\n", __func__, __LINE__, n);
-            err_str = "Error: fcgi_get_header()";
-            break;
-        }
-        
-        if (header.type == FCGI_STDOUT)
-            break;
-        else if (header.type == FCGI_STDERR)
-        {
-            n = fcgi_read_stderr(fcgi_sock, header.len, conf->TimeoutCGI);
-            if (n <= 0)
-            {
-                err_str = "Error: fcgi_read_stderr()";
-                break;
-            }
-            
-            header.len -= n;
-            
-            if (header.paddingLen > 0)
-            {
-                n = fcgi_read_padding(fcgi_sock, header.paddingLen, conf->TimeoutCGI);
-                if (n <= 0)
-                {
-                    err_str = "Error: fcgi_read_padding()";
-                    break;
-                }
-            }
-        }
-        else
-        {
-            err_str = "Error header type";
-            break;
-        }
-    }
-
-    if (err_str)
-    {
-        print_err(req, "<%s:%d> \"%s\"\n", __func__, __LINE__, err_str);
-        return -RS500;
-    }
-    
-    if (header.type != FCGI_STDOUT)
-    {
-        print_err(req, "<%s:%d> Error: %hhu\n", __func__, __LINE__, header.type);
-        return -RS500;
-    }
-    //-------------------------- read headers --------------------------
-    const int size = 41;
-    char buf[size];
-    
-    char *start_ptr = buf;
-    err_str = "Error: Blank line not found";
-    int i = 0;
-
-    while (1)
-    {
-        int len;
-        char *end_ptr, s[64];
-
-        if (i > 0)
-            end_ptr = (char*)memchr(start_ptr, '\n', i);
-        else
-            end_ptr = NULL;
-        if(!end_ptr)
-        {
-            if (header.len == 0)
-                break;
-                
-            if (i > 0)
-                memmove(buf, start_ptr, i);
-            int rd = size - i;
-            if (rd <= 0)
-            {
-                print_err(req, "<%s:%d> Error: size()=%d, i=%d\n", __func__, __LINE__, size, i);
-                err_str = "Error: Buffer for read is small";
-                break;
-            }
-            
-            if (header.len < rd)
-                rd = header.len;
-
-     //       int ret = read_from_script(fcgi_sock, buf + i, rd);
-            int ret = read_timeout(fcgi_sock, buf + i, rd, conf->TimeoutCGI);
-            if (ret <= 0)
-            {
-                print_err(req, "<%s:%d> read_from_script()=%d, read_len=%d\n", __func__, __LINE__, ret, rd);
-                err_str = "Error: Read from script";
-                break;
-            }
-//hex_dump_stderr(__func__, __LINE__, buf + i, ret);
-            header.len -= ret;
-            i = i + ret;
-            start_ptr = buf;
-            continue;
-        }
-        
-        len = end_ptr - start_ptr;
-        i = i - (len + 1);
-        
-        if (len > 0)
-        {
-            if (*(end_ptr - 1) == '\r')
-                --len;
-            memcpy(s, start_ptr, len);
-            s[len] = '\0';
-        }
-
-        start_ptr = end_ptr + 1;
-
-        if(len == 0)
-        {
-            err_str = NULL;
-            break;
-        }
-//print_err("<%s:%d> [%s]\n", __func__, __LINE__, s);
-        char *p;
-        if((p = (char*)memchr(s, ':', len)))
-        {
-            if(!strlcmp_case(s, "Status", 6))
-            {
-                req->resp.respStatus = strtol(++p, NULL, 10);
-          //      if ((req->resp.respStatus >= RS500) || (req->resp.respStatus == RS404))
-                if (req->resp.respStatus >= RS500)
-                {
-                    send_message(req, NULL, NULL);
-                    return 0;
-                }
-
-                continue;
-            }
-            else if(!strlcmp_case(s, "Date", 4) || \
-                !strlcmp_case(s, "Server", 6) || \
-                !strlcmp_case(s, "Accept-Ranges", 13) || \
-                !strlcmp_case(s, "Content-Length", 14) || \
-                !strlcmp_case(s, "Connection", 10))
-            {
-                print_err("<%s:%d> %s\n", __func__, __LINE__, s);
-                continue;
-            }
-            
-            hdrs << s << "\r\n";
-            if (hdrs.error())
-            {
-                err_str = "Error: Create header";
-                break;
-            }
-        }
-        else
-        {
-            err_str = "Error: Line not header";
-            break;
-        }
-    }
-
-    if (err_str)
-    {
-        print_err(req, "<%s:%d> \"%s\" header.len=%d\n", __func__, __LINE__, err_str, header.len);
-        return -1;
-    }
-
-    return fcgi_chunk(req, &hdrs, fcgi_sock, &header, start_ptr, i);
-}
-//======================================================================
-int send_param(Connect *req, int fcgi_sock)
-{
-    int n;
-    char buf[4096];
-    //------------------------- param ----------------------------------
-    fcgi_set_header(buf, FCGI_BEGIN_REQUEST, requestId, 8, 0);
-    
-    buf[8] = (unsigned char) ((FCGI_RESPONDER >> 8) & 0xff);
-    buf[9] = (unsigned char) (FCGI_RESPONDER        & 0xff);
-    buf[10] = 0;//  FCGI_KEEP_CONN : 0
-    buf[11] = 0;
-    buf[12] = 0;
-    buf[13] = 0;
-    buf[14] = 0;
-    buf[15] = 0;
-    
-    n = write_to_script(fcgi_sock, buf, 16, conf->TimeoutCGI);
-    if (n == -1)
-    {
-        print_err(req, "<%s:%d> Error write_timeout(): %s\n", __func__, __LINE__, str_err (errno));
-        return -RS500;
-    }
-//hex_dump_stderr("send_param: FCGI_BEGIN_REQUEST", buf, 16);
-    FCGI_params par(fcgi_sock);
-    
+//print_err("<%s:%d> -------------------------\n", __func__, __LINE__);
+    FCGI_class Fcgi(fcgi_sock);
     if (req->resp.scriptType == php_fpm)
-        par.add("REDIRECT_STATUS", "true");
-    par.add("PATH", "/bin:/usr/bin:/usr/local/bin");
-    par.add("SERVER_SOFTWARE", conf->ServerSoftware.str());
-    par.add("GATEWAY_INTERFACE", "CGI/1.1");
-    par.add("DOCUMENT_ROOT", conf->rootDir.str());
-    par.add("REMOTE_ADDR", req->remoteAddr);
-    par.add("REMOTE_PORT", req->remotePort);
-    par.add("REQUEST_URI", req->uri);
-    
+        Fcgi.add("REDIRECT_STATUS", "true");
+    Fcgi.add("PATH", "/bin:/usr/bin:/usr/local/bin");
+    Fcgi.add("SERVER_SOFTWARE", conf->ServerSoftware.str());
+    Fcgi.add("GATEWAY_INTERFACE", "CGI/1.1"); 
+    Fcgi.add("DOCUMENT_ROOT", conf->rootDir.str());
+    Fcgi.add("REMOTE_ADDR", req->remoteAddr);
+    Fcgi.add("REMOTE_PORT", req->remotePort);
+    Fcgi.add("REQUEST_URI", req->uri);
+
     if (req->reqMethod == M_HEAD)
-        par.add("REQUEST_METHOD", get_str_method(M_GET));
+        Fcgi.add("REQUEST_METHOD", get_str_method(M_GET));
     else
-        par.add("REQUEST_METHOD", get_str_method(req->reqMethod));
+        Fcgi.add("REQUEST_METHOD", get_str_method(req->reqMethod));
     
-    par.add("SERVER_PROTOCOL", get_str_http_prot(req->httpProt));
+    Fcgi.add("SERVER_PROTOCOL", get_str_http_prot(req->httpProt));
     
     if(req->req_hdrs.iHost >= 0)
-        par.add("HTTP_HOST", req->req_hdrs.Value[req->req_hdrs.iHost]);
+        Fcgi.add("HTTP_HOST", req->req_hdrs.Value[req->req_hdrs.iHost]);
     
     if(req->req_hdrs.iReferer >= 0)
-        par.add("HTTP_REFERER", req->req_hdrs.Value[req->req_hdrs.iReferer]);
+        Fcgi.add("HTTP_REFERER", req->req_hdrs.Value[req->req_hdrs.iReferer]);
     
     if(req->req_hdrs.iUserAgent >= 0)
-        par.add("HTTP_USER_AGENT", req->req_hdrs.Value[req->req_hdrs.iUserAgent]);
+        Fcgi.add("HTTP_USER_AGENT", req->req_hdrs.Value[req->req_hdrs.iUserAgent]);
 
-    par.add("SCRIPT_NAME", req->decodeUri);
+    Fcgi.add("SCRIPT_NAME", req->decodeUri);
     
     if (req->resp.scriptType == php_fpm)
     {
         String s = conf->rootDir;
         s << req->resp.scriptName;
-        par.add("SCRIPT_FILENAME", s.str());
+        Fcgi.add("SCRIPT_FILENAME", s.str());
     }
 
     if(req->reqMethod == M_POST)
     {
         if(req->req_hdrs.iReqContentType >= 0)
         {
-            par.add("CONTENT_TYPE", req->req_hdrs.Value[req->req_hdrs.iReqContentType]);
+            Fcgi.add("CONTENT_TYPE", req->req_hdrs.Value[req->req_hdrs.iReqContentType]);
         }
         
         if(req->req_hdrs.iReqContentLength >= 0)
         {
-            par.add("CONTENT_LENGTH", req->req_hdrs.Value[req->req_hdrs.iReqContentLength]);
+            Fcgi.add("CONTENT_LENGTH", req->req_hdrs.Value[req->req_hdrs.iReqContentLength]);
         }
     }
     
-    par.add("QUERY_STRING", req->sReqParam);
-    par.add(NULL, 0); // End FCGI_PARAMS
-    if (par.error())
+    Fcgi.add("QUERY_STRING", req->sReqParam);
+    
+char sVal[] = "00000000000000000000000000000000000000000000000000000000000000000000000000000000-------------------=========01234567890123456789";
+Fcgi.add("Qwerty", sVal);
+    
+    Fcgi.add(NULL, 0); // End FCGI_PARAMS
+    if (Fcgi.error())
     {
         print_err(req, "<%s:%d> Error send_param()\n", __func__, __LINE__);
         return -RS500;
     }
     
-    if(req->reqMethod == M_POST)
-    {
-        if (req->tail)
-        {
-            n = tail_to_fcgi(fcgi_sock, req->tail, req->lenTail);
-            if(n < 0)
-            {
-                print_err(req, "<%s:%d> Error tail to script: %d\n", __func__, __LINE__, n);
-                return -RS500;
-            }
-            req->req_hdrs.reqContentLength -= n;
-        }
-
-        n = client_to_fcgi(req->clientSocket, fcgi_sock, req->req_hdrs.reqContentLength);
-        if (n == -1)
-        {
-            print_err(req, "<%s:%d> Error client_to_fcgi()\n", __func__, __LINE__);
-            return -RS500;
-        }
-    }
+    int ret = fcgi_(req, fcgi_sock);
     
-    fcgi_set_header(buf, FCGI_STDIN, requestId, 0, 0); // End FCGI_STDIN
-//hex_dump_stderr(__func__, __LINE__, buf, 8);
-    n = write_to_script(fcgi_sock, buf, 8, conf->TimeoutCGI);
-    if (n < 0)
-    {
-        print_err(req, "<%s:%d> Error write header [FCGI_STDIN, 0, 0]\n", __func__, __LINE__);
-        return -RS500;
-    }
-
-    return fcgi_read_headers(req, fcgi_sock);
+    return ret;
 }
 //======================================================================
 int fcgi(Connect *req)
@@ -783,11 +444,11 @@ int fcgi(Connect *req)
         if (sock_fcgi == 0)
             ret = -RS400;
         else
-            ret = -RS404;
+            ret = -RS502;
         goto err_exit;
     }
     
-    ret = send_param(req, sock_fcgi);
+    ret = fcgi_send_param(req, sock_fcgi);
     
     close(sock_fcgi);
     

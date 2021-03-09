@@ -115,14 +115,28 @@ fcgi_list_addr *create_fcgi_list()
     return tmp;
 }
 //======================================================================
+int getLine(ifstream & fi, String &s)
+{
+    int n = 0;
+    char c;
+    s.clear();
+    while (fi.get(c))
+    {
+        if (c == '\n') break;
+        s << c;
+        ++n;
+    }
+
+    return n;
+}
+//======================================================================
 void read_conf_file(const char *path_conf)
 {
     String s, ss, nameFile;
-    char buf[512];
 
     nameFile << path_conf;
     nameFile << "/server.conf";
-    fcgi_list_addr *prev = NULL;
+    fcgi_list_addr *end = NULL;
     
     ifstream fconf(nameFile.str(), ios::binary);
     if (!fconf.is_open())
@@ -142,10 +156,9 @@ void read_conf_file(const char *path_conf)
 
     while (!fconf.eof())
     {
-        ss.clear();
-        fconf.getline(buf, sizeof(buf));
-        ss << buf;
+        getLine(fconf, ss);
         ss >> s;
+
         if (s[0] == '#')
             continue;
 
@@ -201,17 +214,25 @@ void read_conf_file(const char *path_conf)
             ss >> c.ClientMaxBodySize;
         else if (s == "index")
         {
+            ss >> s;
+            if (s != "{")
+            {
+                getLine(fconf, ss);
+                ss >> s;
+                if (s != "{")
+                    continue;
+            }
+            
             while (!fconf.eof())
             {
-                ss.clear();
-                fconf.getline(buf, sizeof(buf));
-                ss << buf;
+                getLine(fconf, ss);
                 ss >> s;
+
                 if ((s[0] == '#') || (s[0] == '{'))
                     continue;
                 else if (s[0] == '}')
                     break;
-                
+
                 if (s == "index.html")
                     c.index_html = 'y';
                 else if (s == "index.php")
@@ -229,38 +250,43 @@ void read_conf_file(const char *path_conf)
                 exit(1);
             }
         }
-        
         else if (s == "User")
             ss >> c.user;
         else if (s == "Group")
             ss >> c.group;
         else if (s == "fastcgi")
         {
+            ss >> s;
+            if (s != "{")
+            {
+                getLine(fconf, ss);
+                ss >> s;
+                if (s != "{")
+                    continue;
+            }
+            
             while (!fconf.eof())
             {
-                ss.clear();
-                fconf.getline(buf, sizeof(buf));
-                ss << buf;
+                getLine(fconf, ss);
                 ss >> s;
+
                 if ((s[0] == '#') || (s.len() == 0) || (s[0] == '{'))
                     continue;
                 else if (s[0] == '}')
                     break;
 
-                if (!prev)
+                if (!end)
                 {
-                    prev = c.fcgi_list = create_fcgi_list();
+                    end = c.fcgi_list = create_fcgi_list();
                     c.fcgi_list->scrpt_name = s;
                     ss >> c.fcgi_list->addr;
                 }
                 else
                 {
-                    fcgi_list_addr *tmp;
-                    tmp = create_fcgi_list();
-                    tmp->scrpt_name = s;
-                    ss >> tmp->addr;
-                    prev->next = tmp;
-                    prev = tmp;
+                    end->next = create_fcgi_list();
+                    end->next->scrpt_name = s;
+                    ss >> end->next->addr;
+                    end = end->next;
                 }
             }
             if (s[0] != '}')
@@ -341,99 +367,99 @@ void read_conf_file(const char *path_conf)
     uid_t uid = getuid();
     if (uid == 0)
     {
-		char *p;
-		c.server_uid = strtol(conf->user.str(), &p, 0);
-		if (conf->user.len() && *p != '\0')
-		{
-			struct passwd *passwdbuf = getpwnam(conf->user.str());
-			if (!passwdbuf)
-			{
-				cerr << "[" << __func__ << ":" << __LINE__ << "] Error getpwnam(): " << conf->user.str() << "\n";
-				cout << "[" << __func__ << ":" << __LINE__ << "] Error getpwnam(): " << conf->user.str() << "\n";
-				cin.get();
-				exit(1);
-			}
-			c.server_uid = passwdbuf->pw_uid;
-		}
-		else
-		{
-			struct passwd *passwdbuf;
-			passwdbuf = getpwuid(conf->server_uid);
-			if (passwdbuf == NULL)
-			{
-				cerr << "[" << __func__ << ":" << __LINE__ << "] Error getpwuid(): " << conf->server_uid << "\n";
-				cout << "[" << __func__ << ":" << __LINE__ << "] Error getpwuid(): " << conf->server_uid << "\n";
-				cin.get();
-				exit(1);
-			}
-		}
-		
-		c.server_gid = strtol(conf->group.str(), &p, 0);
-		if (conf->group.len() && *p != '\0')
-		{
-			struct group *groupbuf = getgrnam(conf->group.str());
-			if (!groupbuf)
-			{
-				cerr << "[" << __func__ << ":" << __LINE__ << "] Error getgrnam(): " << conf->group.str() << "\n";
-				cout << "[" << __func__ << ":" << __LINE__ << "] Error getgrnam(): " << conf->group.str() << "\n";
-				cin.get();
-				exit(1);
-			}
-			c.server_gid = groupbuf->gr_gid;
-		}
-		else
-		{
-			struct group *groupbuf;
-			groupbuf = getgrgid(conf->server_gid);
-			if (groupbuf == NULL)
-			{
-				cerr << "[" << __func__ << ":" << __LINE__ << "] Error getgrgid(): " << conf->server_gid << "\n";
-				cout << "[" << __func__ << ":" << __LINE__ << "] Error getgrgid(): " << conf->server_gid << "\n";
-				cin.get();
-				exit(1);
-			}
-		}
-		//--------------------------------------------------------------
-		if (conf->server_uid >= conf->server_gid)
-		{
-			if (setgid(conf->server_uid) == -1)
-			{
-				perror("setgid");
-				cout << "[" << __func__ << ":" << __LINE__ << "] Error setgid(" << conf->server_gid << "): " << strerror(errno)
-					<< "; uid=" << getgid() << "\n";
-				cin.get();
-				exit(1);
-			}
-		}
-		else
-		{
-			if (setgid(conf->server_gid) == -1)
-			{
-				perror("setgid");
-				cout << "[" << __func__ << ":" << __LINE__ << "] Error setgid(" << conf->server_gid << "): " << strerror(errno)
-					<< "; uid=" << getuid() << "\n";
-				cin.get();
-				exit(1);
-			}
-		}
-		
-		if (conf->server_uid != uid)
-		{
-			if (setuid(conf->server_uid) == -1)
-			{
-				perror("setgid");
-				cout << "[" << __func__ << ":" << __LINE__ << "] Error setuid(" << conf->server_uid << "): " << strerror(errno)
-					<< "; uid=" << getuid() << "\n";
-				cin.get();
-				exit(1);
-			}
-		}
-	}
-	else
-	{
-		c.server_uid = getuid();
-		c.server_gid = getgid();
-	}
+        char *p;
+        c.server_uid = strtol(conf->user.str(), &p, 0);
+        if (conf->user.len() && *p != '\0')
+        {
+            struct passwd *passwdbuf = getpwnam(conf->user.str());
+            if (!passwdbuf)
+            {
+                cerr << "[" << __func__ << ":" << __LINE__ << "] Error getpwnam(): " << conf->user.str() << "\n";
+                cout << "[" << __func__ << ":" << __LINE__ << "] Error getpwnam(): " << conf->user.str() << "\n";
+                cin.get();
+                exit(1);
+            }
+            c.server_uid = passwdbuf->pw_uid;
+        }
+        else
+        {
+            struct passwd *passwdbuf;
+            passwdbuf = getpwuid(conf->server_uid);
+            if (passwdbuf == NULL)
+            {
+                cerr << "[" << __func__ << ":" << __LINE__ << "] Error getpwuid(): " << conf->server_uid << "\n";
+                cout << "[" << __func__ << ":" << __LINE__ << "] Error getpwuid(): " << conf->server_uid << "\n";
+                cin.get();
+                exit(1);
+            }
+        }
+        
+        c.server_gid = strtol(conf->group.str(), &p, 0);
+        if (conf->group.len() && *p != '\0')
+        {
+            struct group *groupbuf = getgrnam(conf->group.str());
+            if (!groupbuf)
+            {
+                cerr << "[" << __func__ << ":" << __LINE__ << "] Error getgrnam(): " << conf->group.str() << "\n";
+                cout << "[" << __func__ << ":" << __LINE__ << "] Error getgrnam(): " << conf->group.str() << "\n";
+                cin.get();
+                exit(1);
+            }
+            c.server_gid = groupbuf->gr_gid;
+        }
+        else
+        {
+            struct group *groupbuf;
+            groupbuf = getgrgid(conf->server_gid);
+            if (groupbuf == NULL)
+            {
+                cerr << "[" << __func__ << ":" << __LINE__ << "] Error getgrgid(): " << conf->server_gid << "\n";
+                cout << "[" << __func__ << ":" << __LINE__ << "] Error getgrgid(): " << conf->server_gid << "\n";
+                cin.get();
+                exit(1);
+            }
+        }
+        //--------------------------------------------------------------
+        if (conf->server_uid >= conf->server_gid)
+        {
+            if (setgid(conf->server_uid) == -1)
+            {
+                perror("setgid");
+                cout << "[" << __func__ << ":" << __LINE__ << "] Error setgid(" << conf->server_gid << "): " << strerror(errno)
+                    << "; uid=" << getgid() << "\n";
+                cin.get();
+                exit(1);
+            }
+        }
+        else
+        {
+            if (setgid(conf->server_gid) == -1)
+            {
+                perror("setgid");
+                cout << "[" << __func__ << ":" << __LINE__ << "] Error setgid(" << conf->server_gid << "): " << strerror(errno)
+                    << "; uid=" << getuid() << "\n";
+                cin.get();
+                exit(1);
+            }
+        }
+        
+        if (conf->server_uid != uid)
+        {
+            if (setuid(conf->server_uid) == -1)
+            {
+                perror("setgid");
+                cout << "[" << __func__ << ":" << __LINE__ << "] Error setuid(" << conf->server_uid << "): " << strerror(errno)
+                    << "; uid=" << getuid() << "\n";
+                cin.get();
+                exit(1);
+            }
+        }
+    }
+    else
+    {
+        c.server_uid = getuid();
+        c.server_gid = getgid();
+    }
 }
 //======================================================================
 void free_fcgi_list()

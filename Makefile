@@ -73,7 +73,7 @@ $(OBJSDIR)/log.o: log.cpp main.h String.h
 $(OBJSDIR)/cgi.o: cgi.cpp main.h classes.h String.h
 	$(CC) $(CFLAGS) -c cgi.cpp -o $@
 
-$(OBJSDIR)/fcgi.o: fcgi.cpp main.h classes.h String.h
+$(OBJSDIR)/fcgi.o: fcgi.cpp main.h classes.h String.h fcgi.h
 	$(CC) $(CFLAGS) -c fcgi.cpp -o $@
 
 $(OBJSDIR)/index.o: index.cpp main.h classes.h String.h
