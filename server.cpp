@@ -101,7 +101,7 @@ int main(int argc, char *argv[])
 
     cerr << "  uid=" << getuid() << "; gid=" << getgid() << "\n\n";
     cout << "  uid=" << getuid() << "; gid=" << getgid() << "\n\n";
-	//------------------------------------------------------------------
+    //------------------------------------------------------------------
 
     for ( ; environ[0]; )
     {
@@ -152,9 +152,9 @@ int main(int argc, char *argv[])
 
     close(sockServer);
     
-    while (wait(NULL) != -1)
+    while ((pid = wait(NULL)) != -1)
     {
-        print_err("<> wait()\n");
+        print_err("<> wait() pid: %d\n", pid);
         continue;
     }
         
@@ -176,29 +176,28 @@ pid_t create_child(int num_chld)
 
     if (pid == 0)
     {
-		uid_t uid = getuid();
-		if (uid == 0)
-		{
-			if (setgid(conf->server_gid) == -1)
-			{
-				perror("setgid");
-				cout << "[" << __func__ << "] Error setgid(" << conf->server_gid << "): " << strerror(errno) << "\n";
-				cin.get();
-				exit(1);
-			}
-			
-			if (setuid(conf->server_gid) == -1) // server_uid
-			{
-				perror("setuid");
-				cout << "[" << __func__ << "] Error setuid(" << conf->server_uid << "): " << strerror(errno) << "\n";
-				cin.get();
-				exit(1);
-			}
-		}
-		
+        uid_t uid = getuid();
+        if (uid == 0)
+        {
+            if (setgid(conf->server_gid) == -1)
+            {
+                perror("setgid");
+                cout << "[" << __func__ << "] Error setgid(" << conf->server_gid << "): " << strerror(errno) << "\n";
+                cin.get();
+                exit(1);
+            }
+            
+            if (setuid(conf->server_gid) == -1) // server_uid
+            {
+                perror("setuid");
+                cout << "[" << __func__ << "] Error setuid(" << conf->server_uid << "): " << strerror(errno) << "\n";
+                cin.get();
+                exit(1);
+            }
+        }
+        
         manager(sockServer, num_chld);
 
-        print_err("<%s:%d> *********** Exit child %d ***********\n", __func__, __LINE__, num_chld);
         close_logs();
         
         exit(0);

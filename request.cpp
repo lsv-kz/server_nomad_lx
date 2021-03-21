@@ -67,18 +67,15 @@ void get_request(RequestManager *ReqMan)
             req->uriLen = p - req->uri;
             req->sReqParam = req->uri + req->uriLen + 1;
         }
+        else if ((p = strstr_case(req->uri, "%3F")))
+        {
+            req->uriLen = p - req->uri;
+            req->sReqParam = req->uri + req->uriLen + 3;
+        }
         else
         {
-            if ((p = strstr_case(req->uri, "%3F")))
-            {
-                req->uriLen = p - req->uri;
-                req->sReqParam = req->uri + req->uriLen + 3;
-            }
-            else
-            {
-                req->sReqParam = NULL;
-                req->uriLen = strlen(req->uri);
-            }
+            req->sReqParam = NULL;
+            req->uriLen = strlen(req->uri);
         }
 
         decode(req->uri, req->uriLen, req->decodeUri, sizeof(req->decodeUri) - 1);

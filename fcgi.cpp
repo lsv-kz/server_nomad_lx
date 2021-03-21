@@ -370,9 +370,6 @@ int fcgi_send_param(Connect *req, int fcgi_sock)
     
     Fcgi.add("QUERY_STRING", req->sReqParam);
     
-char sVal[] = "00000000000000000000000000000000000000000000000000000000000000000000000000000000-------------------=========01234567890123456789";
-Fcgi.add("Qwerty", sVal);
-    
     Fcgi.add(NULL, 0); // End FCGI_PARAMS
     if (Fcgi.error())
     {

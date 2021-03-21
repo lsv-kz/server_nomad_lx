@@ -127,7 +127,6 @@ void queue2(RequestManager *ReqMan)
         }
     }
 
-    print_err("[%d]<%s:%d> *** Exit queue2() ***\n", num_chld, __func__, __LINE__);
     delete [] fdrd;
 }
 //======================================================================

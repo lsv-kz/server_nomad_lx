@@ -211,14 +211,6 @@ unique_lock<mutex> lk(mtx_thr);
     return 0;
 }
 //======================================================================
-void RequestManager::print_intr()
-{
-mtx_thr.lock();
-    print_err("[%d]<%s:%d> thr=%d, conn=%d, qu=%d, num_wait_thr=%d\n", numChld, __func__, __LINE__, 
-                                count_thr, count_conn, len_qu, num_wait_thr);
-mtx_thr.unlock();
-}
-//======================================================================
 void thr_create_manager(int numProc, RequestManager *ReqMan)
 {
     int num_thr;
@@ -243,27 +235,22 @@ void thr_create_manager(int numProc, RequestManager *ReqMan)
 
         ReqMan->start_thr();
     }
-    print_err("[%d] <%s:%d> Exit thread_req_manager()\n", numProc, __func__, __LINE__);
 }
 //======================================================================
-static int nChld, num_c = 0;
+static int nChld;
 int servSock;
-RequestManager *RM;
-unsigned long allConn = 0;
 //======================================================================
 static void signal_handler(int sig)
 {
     if (sig == SIGINT)
     {
-        RM->print_intr();
-        print_err("[%d] <%s:%d> ### SIGINT ### all_conn=%d\n", nChld, __func__, __LINE__, num_c);
+        print_err("[%d] <%s:%d> ###### SIGINT ######\n", nChld, __func__, __LINE__);
         shutdown(servSock, SHUT_RDWR);
         close(servSock);
         
     }
     else if (sig == SIGSEGV)
     {
-        RM->print_intr();
         print_err("[%d] <%s:%d> ### SIGSEGV ###\n", nChld, __func__, __LINE__);
         exit(1);
     }
@@ -275,10 +262,8 @@ void set_sndbuf(int n);
 //======================================================================
 void manager(int sockServer, int numChld)
 {
-    int n;
-    RequestManager *ReqMan;
-
-    ReqMan = new(nothrow) RequestManager(numChld);
+    unsigned long allConn = 0;
+    RequestManager *ReqMan = new(nothrow) RequestManager(numChld);
     if (!ReqMan)
     {
         print_err("<%s:%d> *********** Exit child %d ***********\n", __func__, __LINE__, numChld);
@@ -288,7 +273,6 @@ void manager(int sockServer, int numChld)
     
     nChld = numChld;
     servSock = sockServer;
-    RM = ReqMan;
 
     if (signal(SIGINT, signal_handler) == SIG_ERR)
     {
@@ -324,7 +308,7 @@ void manager(int sockServer, int numChld)
         exit(errno);
     }
     //------------------------------------------------------------------
-    n = 0;
+    int n = 0;
     while (n < conf->MinThreads)
     {
         thread thr;
@@ -390,8 +374,6 @@ void manager(int sockServer, int numChld)
                 break;
             }
         }
-        
-        num_c++;
 
         Connect *req;
         req = create_req();
@@ -477,7 +459,6 @@ void manager(int sockServer, int numChld)
     close_queue2();
     thrQueue2.join();
 
-    print_err("[%d] <%s:%d> *** Exit  ***\n", numChld, __func__, __LINE__);
     delete ReqMan;
 }
 //======================================================================

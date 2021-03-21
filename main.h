@@ -239,8 +239,6 @@ public:
     int wait_create_thr(int*);
     void close_manager();
     void end_response(Connect*);
-    
-    void print_intr();
 };
 //----------------------------------------------------------------------
 extern char **environ;
