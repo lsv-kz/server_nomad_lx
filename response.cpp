@@ -2,6 +2,144 @@
 
 using namespace std;
 
+//======================================================================
+void response1(RequestManager *ReqMan)
+{
+    const char *p;
+    Connect *req;
+
+    while(1)
+    {
+        req = ReqMan->pop_req();
+        if (!req)
+        {
+            print_err("[%d] <%s:%d>  req = NULL\n", ReqMan->get_num_chld(), __func__, __LINE__);
+            ReqMan->end_thr(1);
+            return;
+        }
+        else if (req->clientSocket < 0)
+        {
+            ReqMan->end_thr(1);
+            delete req;
+            continue;
+        }
+        /*------------------------------------------------------------*/
+        get_time(req->resp.sLogTime);
+        int ret = parse_startline_request(req, req->arrHdrs[0].ptr, req->arrHdrs[0].len);
+        if (ret)
+        {
+            print_err(req, "<%s:%d>  Error parse_startline_request(): %d\n", __func__, __LINE__, ret);
+            goto end;
+        }
+     
+        for (int i = 1; i < req->i_arrHdrs; ++i)
+        {
+            ret = parse_headers(req, req->arrHdrs[i].ptr, req->arrHdrs[i].len);
+            if (ret < 0)
+            {
+                print_err(req, "<%s:%d>  Error parse_headers(): %d\n", __func__, __LINE__, ret);
+                goto end;
+            }
+        }
+        /*--------------------------------------------------------*/
+        if ((req->httpProt != HTTP10) && (req->httpProt != HTTP11))
+        {
+            req->httpProt = HTTP11;
+            req->connKeepAlive = 0;
+            req->err = -RS505;
+            goto end;
+        }
+
+        if (req->numReq >= (unsigned int)conf->MaxRequestsPerThr || (conf->KeepAlive == 'n') || (req->httpProt == HTTP10))
+            req->connKeepAlive = 0;
+        else if (req->req_hdrs.iConnection == -1)
+            req->connKeepAlive = 1;
+
+        if ((p = strchr(req->uri, '?')))
+        {
+            req->uriLen = p - req->uri;
+            req->sReqParam = req->uri + req->uriLen + 1;
+        }
+        else
+        {
+            if ((p = strstr_case(req->uri, "%3F")))
+            {
+                req->uriLen = p - req->uri;
+                req->sReqParam = req->uri + req->uriLen + 3;
+            }
+            else
+            {
+                req->sReqParam = NULL;
+                req->uriLen = strlen(req->uri);
+            }
+        }
+
+        if (decode(req->uri, req->uriLen, req->decodeUri, sizeof(req->decodeUri) - 1) < 0)
+        {
+            print_err(req, "<%s:%d> Error: decode URI\n", __func__, __LINE__);
+            req->err = -RS404;
+            goto end;
+        }
+        clean_path(req->decodeUri);
+        req->lenDecodeUri = strlen(req->decodeUri);
+
+        if (strstr(req->uri, ".php") && (conf->UsePHP != "php-cgi") && (conf->UsePHP != "php-fpm"))
+        {
+            print_err(req, "<%s:%d> Error UsePHP=%s\n", __func__, __LINE__, conf->UsePHP.str());
+            req->err = -RS404;
+            goto end;
+        }
+
+        if (req->req_hdrs.iUpgrade >= 0)
+        {
+            print_err(req, "<%s:%d> req->upgrade: %s\n", __func__, __LINE__, req->req_hdrs.Value[req->req_hdrs.iUpgrade]);
+            req->connKeepAlive = 0;
+            req->err = -RS505;
+            goto end;
+        }
+        //--------------------------------------------------------------
+        if ((req->reqMethod == M_GET) || (req->reqMethod == M_HEAD) || (req->reqMethod == M_POST))
+        {
+            int ret = response2(req);
+            if (ret == 1)
+            {// "req" may be free !!!
+                ret = ReqMan->end_thr(0);
+                if (ret == EXIT_THR)
+                    return;
+                else
+                    continue;
+            }
+            
+            req->err = ret;
+        }
+        else if (req->reqMethod == M_OPTIONS)
+        {   
+            req->err = options(req);
+        }
+        else
+            req->err = -RS501;
+
+    end:
+
+        if (req->err <= -RS101)
+        {
+            req->resp.respStatus = -req->err;
+            send_message(req, "", NULL);
+
+            if ((req->reqMethod == M_POST) || (req->reqMethod == M_PUT))
+                req->connKeepAlive = 0;
+        }
+
+        end_response(req);
+        
+        ret = ReqMan->end_thr(0);
+        if (ret)
+        {
+            return;
+        }
+    }
+}
+//======================================================================
 int send_multy_part(Connect *req, ArrayRanges& rg, char *rd_buf, int size);
 int create_multipart_head(Connect *req, Range *ranges, char *buf, int len_buf);
 const char boundary[] = "---------a9b5r7a4c0a2d5a1b8r3a";
@@ -34,7 +172,6 @@ int fastcgi(Connect* req, const char* uri)
             if (uri == i->scrpt_name)
                 break;
         }
-        
     }
 
     if (!i)
@@ -46,7 +183,7 @@ int fastcgi(Connect* req, const char* uri)
     return ret;
 }
 //======================================================================
-int response(Connect *req)
+int response2(Connect *req)
 {
     struct stat st;
     char *p = strstr(req->decodeUri, ".php");
@@ -63,11 +200,11 @@ int response(Connect *req)
         if (stat(req->decodeUri + 1, &st) == -1)
         {
             print_err(req, "<%s:%d> script (%s) not found\n", __func__, __LINE__, req->decodeUri);
-            return -RS404;
+//            return -RS404;
         }
-        
-        string s = req->decodeUri;
-        req->resp.scriptName = s.c_str();
+   //     String s = req->decodeUri;
+   //     req->resp.scriptName = s.c_str();
+        req->resp.scriptName = req->decodeUri;
 
         if (conf->UsePHP == "php-fpm")
         {
@@ -92,13 +229,13 @@ int response(Connect *req)
         int ret;
         req->resp.scriptType = cgi_ex;
         
-        string s = req->decodeUri;
-        req->resp.scriptName = s.c_str();
+    //    String s = req->decodeUri;
+        req->resp.scriptName = req->decodeUri;//s.c_str();
 
         ret = cgi(req);
         return ret;
     }
-    //------------------------- dir or file ----------------------------
+    //------------------------------------------------------------------
     String path;
 //  path.reserve(req->conf->rootDir.size() + req->lenDecodeUri + 256);
 //  path = req->conf->rootDir;
@@ -125,7 +262,7 @@ int response(Connect *req)
             return -RS403;
         }
     }
-    //------------------------ list dir --------------------------------
+    //------------------------------------------------------------------
     if (S_ISDIR(st.st_mode))
     {
         if (req->uri[req->uriLen - 1] != '/')
@@ -213,7 +350,7 @@ int response(Connect *req)
             return index_dir(req, path);
         }
     }
-    //----------------------- send file --------------------------------
+    //------------------------------------------------------------------
     req->resp.fileSize = file_size(path.str());
     req->resp.numPart = 0;
     req->resp.respContentType = content_type(path.str());
@@ -258,7 +395,7 @@ int response(Connect *req)
         req->resp.respContentLength = req->resp.fileSize;
     }
     //------------------------------------------------------------------
-    req->resp.fd = open(path.str(), O_RDONLY);
+    req->resp.fd = open(path.str(), O_RDONLY); //  | O_DIRECT
     if (req->resp.fd == -1)
     {
         if (errno == EACCES)
@@ -385,7 +522,7 @@ int send_multy_part(Connect *req, ArrayRanges& rg, char *rd_buf, int size)
     req->resp.send_bytes += n;
     return 0;
 }
-/*====================================================================*/
+//======================================================================
 int create_multipart_head(Connect *req, struct Range *ranges, char *buf, int len_buf)
 {
     int n, all = 0;
@@ -418,4 +555,15 @@ int create_multipart_head(Connect *req, struct Range *ranges, char *buf, int len
         return 0;
 
     return all;
+}
+//======================================================================
+int options(Connect *req)
+{
+    req->resp.respStatus = RS200;
+    if (send_response_headers(req, NULL))
+    {
+        return -1;
+    }
+
+    return 0;
 }

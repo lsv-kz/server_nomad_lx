@@ -2,13 +2,11 @@ CFLAGS = -Wall -O2 -g -std=c++11
 
 CC = c++
 #CC = clang++
-#CC = clang++-3.9
 
 OBJSDIR = objs
 $(shell mkdir -p $(OBJSDIR))
 
 OBJS = $(OBJSDIR)/server.o \
-	$(OBJSDIR)/queue2.o \
 	$(OBJSDIR)/classes.o \
 	$(OBJSDIR)/send_headers.o \
 	$(OBJSDIR)/config.o \
@@ -17,7 +15,7 @@ OBJS = $(OBJSDIR)/server.o \
 	$(OBJSDIR)/response.o \
 	$(OBJSDIR)/send_files.o \
 	$(OBJSDIR)/create_socket.o \
-	$(OBJSDIR)/percent_decoding.o \
+	$(OBJSDIR)/percent_coding.o \
 	$(OBJSDIR)/rd_wr.o \
 	$(OBJSDIR)/functions.o \
 	$(OBJSDIR)/log.o \
@@ -30,9 +28,6 @@ server: $(OBJS)
 
 $(OBJSDIR)/server.o: server.cpp main.h
 	$(CC) $(CFLAGS) -c server.cpp -o $@
-
-$(OBJSDIR)/queue2.o: queue2.cpp main.h
-	$(CC) $(CFLAGS) -c queue2.cpp -o $@
 
 $(OBJSDIR)/classes.o: classes.cpp main.h classes.h String.h
 	$(CC) $(CFLAGS) -c classes.cpp -o $@
@@ -58,8 +53,8 @@ $(OBJSDIR)/send_files.o: send_files.cpp main.h
 $(OBJSDIR)/create_socket.o: create_socket.cpp main.h
 	$(CC) $(CFLAGS) -c create_socket.cpp -o $@
 
-$(OBJSDIR)/percent_decoding.o: percent_decoding.cpp main.h
-	$(CC) $(CFLAGS) -c percent_decoding.cpp -o $@
+$(OBJSDIR)/percent_coding.o: percent_coding.cpp main.h
+	$(CC) $(CFLAGS) -c percent_coding.cpp -o $@
 
 $(OBJSDIR)/rd_wr.o: rd_wr.cpp main.h
 	$(CC) $(CFLAGS) -c rd_wr.cpp -o $@

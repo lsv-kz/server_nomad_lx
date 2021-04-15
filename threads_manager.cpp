@@ -2,12 +2,16 @@
 
 using namespace std;
 
+mutex mtx_conn;
+condition_variable cond_close_conn;
+
+static int count_conn = 0;
 //======================================================================
 RequestManager::RequestManager(int n)
 {
-    list_begin = list_end = NULL;
-    len_qu = stop_manager = all_thr = need_create_thr = 0;
-    count_thr = count_conn = num_wait_thr = 0;
+    list2_start = list2_end = NULL;
+    size_list2 = stop_manager = all_thr = 0;
+    count_thr = num_wait_thr = 0;
     numChld = n;
 }
 //----------------------------------------------------------------------
@@ -23,24 +27,13 @@ int RequestManager::get_num_chld(void)
 //----------------------------------------------------------------------
 int RequestManager::get_num_thr(void)
 {
-mtx_thr.lock();
-    int ret = count_thr;
-mtx_thr.unlock();
-    return ret;
+lock_guard<std::mutex> lg(mtx_thr);
+    return count_thr;
 }
 //----------------------------------------------------------------------
 int RequestManager::get_all_thr(void)
 {
     return all_thr;
-}
-//----------------------------------------------------------------------
-int RequestManager::get_num_conn(void)
-{
-//lock_guard<std::mutex> lg(mtx_thr);
-mtx_thr.lock();
-    int ret = count_conn;
-mtx_thr.unlock();
-    return ret;
 }
 //----------------------------------------------------------------------
 int RequestManager::start_thr(void)
@@ -61,91 +54,58 @@ void RequestManager::wait_exit_thr(int n)
     }
 }
 //----------------------------------------------------------------------
-int RequestManager::push_req(Connect *req, int inc)
+void RequestManager::push_req(Connect *req)
 {
-    int ret;
 mtx_thr.lock();
     req->next = NULL;
-    req->prev = list_end;
-    if (list_begin)
+    req->prev = list2_end;
+    if (list2_start)
     {
-        list_end->next = req;
-        list_end = req;
+        list2_end->next = req;
+        list2_end = req;
     }
     else
-        list_begin = list_end = req;
-        
-    if (inc)
-        ++count_conn;
-    ret = ++len_qu;
-    
+        list2_start = list2_end = req;
+
+    ++size_list2;
 mtx_thr.unlock();
-
-    cond_push.notify_one();
-
-    return ret;
+    cond_list.notify_one();
 }
 //----------------------------------------------------------------------
 Connect *RequestManager::pop_req()
 {
-    Connect *req;
-    
 unique_lock<mutex> lk(mtx_thr);
     ++num_wait_thr;
-    while (list_begin == NULL)
+    while (list2_start == NULL)
     {
-        cond_push.wait(lk);
+        cond_list.wait(lk);
     }
     --num_wait_thr;
-    req = list_begin;
-    if (list_begin->next)
+    Connect *req = list2_start;
+    if (list2_start->next)
     {
-        list_begin->next->prev = NULL;
-        list_begin = list_begin->next;
+        list2_start->next->prev = NULL;
+        list2_start = list2_start->next;
     }
     else
-        list_begin = list_end = NULL;
+        list2_start = list2_end = NULL;
     
-    --len_qu;
+    --size_list2;
     if (num_wait_thr <= 1)
-    {
-        need_create_thr = 1;
         cond_new_thr.notify_one();
-    }
 
     return req;
 }
 //----------------------------------------------------------------------
 int RequestManager::wait_create_thr(int *n)
 {
-    while (1)
+unique_lock<mutex> lk(mtx_thr);
+    while (((num_wait_thr >= 1) || (count_thr >= conf->MaxThreads)) && !stop_manager)
     {
-    unique_lock<mutex> lk(mtx_thr);
-
-        while (((need_create_thr == 0) || (num_wait_thr > 0)) && !stop_manager)
-        {
-            cond_new_thr.wait(lk);
-        }
-        
-        if (stop_manager)
-            return num_wait_thr;
-        
-        while ((count_thr >= conf->MaxThreads) && !stop_manager)
-        {
-            cond_exit_thr.wait(lk);
-        }
-
-        if (stop_manager)
-            return num_wait_thr;
-
-        if ((need_create_thr > 0) && (num_wait_thr <= 0))
-        {
-            need_create_thr = 0;
-            *n = count_thr;
-            break;
-        }
+        cond_new_thr.wait(lk);
     }
 
+    *n = count_thr;
     return stop_manager;
 }
 //----------------------------------------------------------------------
@@ -153,7 +113,7 @@ int RequestManager::end_thr(int ret)
 {
 mtx_thr.lock();
     
-    if (((count_thr > conf->MinThreads) && (len_qu <= num_wait_thr)) || ret)
+    if (((count_thr > conf->MinThreads) && (size_list2 <= num_wait_thr)) || ret)
     {
         --count_thr;
         ret = EXIT_THR;
@@ -161,7 +121,10 @@ mtx_thr.lock();
     
 mtx_thr.unlock();
     if (ret)
+    {
         cond_exit_thr.notify_all();
+        cond_new_thr.notify_all();
+    }
     return ret;
 }
 //--------------------------------------------
@@ -171,8 +134,31 @@ void RequestManager::close_manager()
     cond_new_thr.notify_one();
     cond_exit_thr.notify_one();
 }
-//----------------------------------------------------------------------
-void RequestManager::end_response(Connect *req)
+//======================================================================
+int get_num_conn(void)
+{
+lock_guard<std::mutex> lg(mtx_conn);
+    return count_conn;
+}
+//======================================================================
+void start_conn(void)
+{
+mtx_conn.lock();
+    ++count_conn;
+mtx_conn.unlock();
+}
+//======================================================================
+int check_num_conn()
+{
+unique_lock<mutex> lk(mtx_conn);
+    while (count_conn >= conf->MAX_REQUESTS)
+    {
+        cond_close_conn.wait(lk);
+    }
+    return 0;
+}
+//======================================================================
+void end_response(Connect *req)
 {
     if (conf->tcp_cork == 'y')
     {
@@ -188,27 +174,26 @@ void RequestManager::end_response(Connect *req)
         shutdown(req->clientSocket, SHUT_RDWR);
         close(req->clientSocket);
         delete req;
-    mtx_thr.lock();
+    mtx_conn.lock();
         --count_conn;
-    mtx_thr.unlock();
+    mtx_conn.unlock();
         cond_close_conn.notify_all();
     }
     else
     {
         print_log(req);
+        req->timeout = conf->TimeoutKeepAlive;
         ++req->numReq;
-        push_resp_queue2(req);
+        push_list1(req);
     }
 }
-//----------------------------------------------------------------------
-int RequestManager::check_num_conn()
+//======================================================================
+void RequestManager::print_intr()
 {
-unique_lock<mutex> lk(mtx_thr);
-    while (count_conn >= conf->MAX_REQUESTS)
-    {
-        cond_close_conn.wait(lk);
-    }
-    return 0;
+mtx_thr.lock();
+    print_err("[%d]<%s:%d> thr=%d, conn=%d, qu=%d, num_wait_thr=%d\n", numChld, __func__, __LINE__, 
+                                count_thr, count_conn, size_list2, num_wait_thr);
+mtx_thr.unlock();
 }
 //======================================================================
 void thr_create_manager(int numProc, RequestManager *ReqMan)
@@ -222,7 +207,7 @@ void thr_create_manager(int numProc, RequestManager *ReqMan)
             break;
         try
         {
-            thr = thread(get_request, ReqMan);
+            thr = thread(response1, ReqMan);
         }
         catch (...)
         {
@@ -235,22 +220,27 @@ void thr_create_manager(int numProc, RequestManager *ReqMan)
 
         ReqMan->start_thr();
     }
+//    print_err("[%d] <%s:%d> Exit thread_req_manager()\n", numProc, __func__, __LINE__);
 }
 //======================================================================
-static int nChld;
+static int nChld, num_c = 0;
 int servSock;
+RequestManager *RM;
+unsigned long allConn = 0;
 //======================================================================
 static void signal_handler(int sig)
 {
     if (sig == SIGINT)
     {
-        print_err("[%d] <%s:%d> ###### SIGINT ######\n", nChld, __func__, __LINE__);
+  //      RM->print_intr();
+        print_err("[%d] <%s:%d> ### SIGINT ### all_conn=%d\n", nChld, __func__, __LINE__, num_c);
         shutdown(servSock, SHUT_RDWR);
         close(servSock);
         
     }
     else if (sig == SIGSEGV)
     {
+        RM->print_intr();
         print_err("[%d] <%s:%d> ### SIGSEGV ###\n", nChld, __func__, __LINE__);
         exit(1);
     }
@@ -262,7 +252,6 @@ void set_sndbuf(int n);
 //======================================================================
 void manager(int sockServer, int numChld)
 {
-    unsigned long allConn = 0;
     RequestManager *ReqMan = new(nothrow) RequestManager(numChld);
     if (!ReqMan)
     {
@@ -273,6 +262,7 @@ void manager(int sockServer, int numChld)
     
     nChld = numChld;
     servSock = sockServer;
+    RM = ReqMan;
 
     if (signal(SIGINT, signal_handler) == SIG_ERR)
     {
@@ -289,7 +279,7 @@ void manager(int sockServer, int numChld)
     thread SendFile;
     try
     {
-        SendFile = thread(send_files, ReqMan);
+        SendFile = thread(send_files, numChld);
     }
     catch (...)
     {
@@ -297,14 +287,14 @@ void manager(int sockServer, int numChld)
         exit(errno);
     }
     //------------------------------------------------------------------
-    thread thrQueue2;
+    thread thrRequest;
     try
     {
-        thrQueue2 = thread(queue2, ReqMan);
+        thrRequest = thread(get_request, ReqMan);
     }
     catch (...)
     {
-        print_err("[%d] <%s:%d> Error create thread(Queue2): errno=%d \n", numChld, __func__, __LINE__, errno);
+        print_err("[%d] <%s:%d> Error create thread(get_request): errno=%d \n", numChld, __func__, __LINE__, errno);
         exit(errno);
     }
     //------------------------------------------------------------------
@@ -314,7 +304,7 @@ void manager(int sockServer, int numChld)
         thread thr;
         try
         {
-            thr = thread(get_request, ReqMan);
+            thr = thread(response1, ReqMan);
         }
         catch (...)
         {
@@ -347,33 +337,20 @@ void manager(int sockServer, int numChld)
         socklen_t addrSize;
         struct sockaddr_storage clientAddr;
        
-        ReqMan->check_num_conn();
+        check_num_conn();
 
         addrSize = sizeof(struct sockaddr_storage);
         int clientSocket = accept(sockServer, (struct sockaddr *)&clientAddr, &addrSize);
         if (clientSocket == -1)
         {
-            if (errno == EINTR)
-            {
-                print_err("<%s:%d>  Error accept(): %s\n", __func__, __LINE__, strerror(errno));
+            print_err("[%d] <%s:%d>  Error accept(): %s\n", numChld, __func__, __LINE__, strerror(errno));
+            if ((errno == EINTR) || (errno == EMFILE) || (errno == EAGAIN))
                 continue;
-            }
-            else if (errno == EMFILE)
-            {
-                print_err("<%s:%d>  Error accept(): %s; num_req=%d\n", __func__, __LINE__, strerror(errno), ReqMan->get_num_conn());
-                continue;
-            }
-            else if (errno == EAGAIN)
-            {
-                print_err("<%s:%d>  Error accept(): EAGAIN; %d\n", __func__, __LINE__, ReqMan->get_num_conn());
-                continue;
-            }
             else
-            {
-                print_err("[%d] <%s:%d>  Error accept(): %s\n", numChld, __func__, __LINE__, strerror(errno));
                 break;
-            }
         }
+        
+        num_c++;
 
         Connect *req;
         req = create_req();
@@ -408,20 +385,13 @@ void manager(int sockServer, int numChld)
             else
                 print_err("[%u] <%s:%d> Error getsockopt(SO_SNDBUF): %s\n", numChld, __func__, __LINE__, strerror(errno));
         }
-        
-        if (conf->tcp_cork == 'y')
-        {
-            int optval = 1;
-            setsockopt(clientSocket, SOL_TCP, TCP_CORK, &optval, sizeof(optval));
-        }
 
+        req->err = 0;
         req->numChld = numChld;
         req->numConn = ++allConn;
         req->numReq = 0;
         req->clientSocket = clientSocket;
         req->timeout = conf->TimeOut;
-        req->remoteAddr[0] = '\0';
-        req->remotePort[0] = '\0';
         getnameinfo((struct sockaddr *)&clientAddr, 
                     addrSize, 
                     req->remoteAddr, 
@@ -430,15 +400,16 @@ void manager(int sockServer, int numChld)
                     sizeof(req->remotePort), 
                     NI_NUMERICHOST | NI_NUMERICSERV);
 
-        ReqMan->push_req(req, 1);
+        start_conn();
+        push_list1(req);
     }
 
     ReqMan->close_manager();
     thrReqMan.join();
 
     n = ReqMan->get_num_thr();
-    print_err("[%d] <%s:%d>  numThr=%d; allNumThr=%u; allConn=%u; num_req=%d\n", numChld, 
-                    __func__, __LINE__, n, ReqMan->get_all_thr(), allConn, ReqMan->get_num_conn());
+    print_err("[%d] <%s:%d>  numThr=%d; allNumThr=%u; allConn=%u; num_conn=%d\n", numChld, 
+                    __func__, __LINE__, n, ReqMan->get_all_thr(), allConn, get_num_conn());
 
     while (n)
     {
@@ -449,32 +420,24 @@ void manager(int sockServer, int numChld)
             break;
         }
         req->clientSocket = -1;
-        ReqMan->push_req(req, 0);
+        ReqMan->push_req(req);
         --n;
     }
     
     close_queue1();
     SendFile.join();
     
-    close_queue2();
-    thrQueue2.join();
+    close_request();
+    thrRequest.join();
 
+ //   print_err("[%d] <%s:%d> *** Exit  ***\n", numChld, __func__, __LINE__);
     delete ReqMan;
 }
 //======================================================================
 Connect *create_req(void)
 {
-    Connect *req = NULL;
-
-    req = new(nothrow) Connect;
+    Connect *req = new(nothrow) Connect;
     if (!req)
-    {
         print_err("<%s:%d> Error malloc(): %s\n", __func__, __LINE__, str_err(errno));
-    }
-    else
-    {
-        req->init();
-    }
-    
     return req;
 }

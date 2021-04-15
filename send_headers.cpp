@@ -68,7 +68,7 @@ int send_response_headers(Connect *req, String *hdrs)
     if (resp.error())
     {
         print_err("<%s:%d> Error create response headers\n", __func__, __LINE__);
-        req->req_hdrs.iReferer = NUM_HEADERS - 1;
+        req->req_hdrs.iReferer = MAX_HEADERS - 1;
         req->req_hdrs.Value[req->req_hdrs.iReferer] = "Error create response headers";
         return -1;
     }
@@ -77,7 +77,7 @@ int send_response_headers(Connect *req, String *hdrs)
     if(n <= 0)
     {
         print_err("<%s:%d> Sent to client response error; (%d)\n", __func__, __LINE__, n);
-        req->req_hdrs.iReferer = NUM_HEADERS - 1;
+        req->req_hdrs.iReferer = MAX_HEADERS - 1;
         req->req_hdrs.Value[req->req_hdrs.iReferer] = "Error send response headers";
         return -1;
     }

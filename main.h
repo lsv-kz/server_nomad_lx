@@ -42,7 +42,7 @@
 #define     MAX_PATH          2048
 #define     MAX_NAME           256
 #define     LEN_BUF_REQUEST   8192
-#define     NUM_HEADERS         25
+#define     MAX_HEADERS         25
 
 typedef struct fcgi_list_addr {
     String scrpt_name;
@@ -94,6 +94,7 @@ struct Config
     char SEND_FILE = 'n';
     
     int MAX_REQUESTS = 256;
+    int MAX_FD;
 
     char KeepAlive = 'y';
     int TimeoutKeepAlive = 5;
@@ -128,6 +129,11 @@ struct Config
 //----------------------------------------------------------------------
 extern const Config* const conf;
 //----------------------------------------------------------------------
+struct hdr {
+    char *ptr;
+    int len;
+};
+
 class Connect
 {
 public:
@@ -136,20 +142,22 @@ public:
     static int serverSocket;
     
     unsigned int numConn, numReq;
-    int       numChld, clientSocket, timeout;
+    int       numChld, clientSocket;
     int       err;
     time_t    sock_timeout;
-    struct timeval tv;
-    int       num_write;
-    int       index_fdwr;
+    int       timeout;
     
     char      remoteAddr[NI_MAXHOST];
     char      remotePort[NI_MAXSERV];
     
     char      bufReq[LEN_BUF_REQUEST];
     
+    int       i_bufReq;
+    char      *p_newline;
     char      *tail;
     int       lenTail;
+    int       i_arrHdrs;
+    hdr       arrHdrs[MAX_HEADERS + 1];
     
     char      decodeUri[LEN_BUF_REQUEST];
     unsigned int lenDecodeUri;
@@ -176,11 +184,11 @@ public:
         int  iRange;
         int  iIfRange;
         
-        int       countReqHeaders;
         long long reqContentLength;
         
-        const char      *Name[NUM_HEADERS];
-        const char      *Value[NUM_HEADERS];
+        int       countReqHeaders;
+        const char      *Name[MAX_HEADERS + 1];
+        const char      *Value[MAX_HEADERS + 1];
     } req_hdrs;
     //--------------------------------------
     struct {
@@ -201,21 +209,23 @@ public:
     } resp;
     
     void init();
+    int hd_read();
+    int empty_line();
 };
 //----------------------------------------------------------------------
 class RequestManager
 {
 private:
-    Connect *list_begin = NULL;
-    Connect *list_end = NULL;
+    Connect *list2_start;
+    Connect *list2_end;
 
     std::mutex mtx_thr;
     
-    std::condition_variable cond_push;
-    std::condition_variable cond_close_conn, cond_new_thr, cond_exit_thr;
+    std::condition_variable cond_list;
+    std::condition_variable cond_new_thr, cond_exit_thr;
     
-    int num_wait_thr, len_qu, need_create_thr;
-    int count_thr, count_conn, stop_manager;
+    int num_wait_thr, size_list2;
+    int count_thr, stop_manager;
     
     int numChld;
     unsigned long all_thr;
@@ -227,29 +237,27 @@ public:
     ~RequestManager();
     //-------------------------------
     int get_num_chld(void);
-    int get_num_conn(void);
     int get_num_thr(void);
     int get_all_thr(void);
     int start_thr(void);
-    int check_num_conn();
     void wait_exit_thr(int n);
-    int push_req(Connect *req, int);
+    void push_req(Connect *req);
     Connect *pop_req();
     int end_thr(int);
     int wait_create_thr(int*);
     void close_manager();
-    void end_response(Connect*);
+    
+    void print_intr();
 };
 //----------------------------------------------------------------------
 extern char **environ;
 //----------------------------------------------------------------------
-void get_request(RequestManager *ReqMan);
-int response(Connect *req);
+void response1(RequestManager *ReqMan);
+int response2(Connect *req);
 int options(Connect *req);
+int index_dir(Connect *req, String& path);
 int cgi(Connect *req);
 int fcgi(Connect *req);
-int index_dir(Connect *req, String& path);
-
 int create_fcgi_socket(const char *host);
 void free_fcgi_list();
 //----------------------------------------------------------------------
@@ -273,9 +281,8 @@ int fcgi_read_padding(int fd, unsigned char len, int timeout);
 int fcgi_read_stderr(int fd, int cont_len, int timeout);
 
 int send_largefile(Connect *req, char *buf, int size, off_t offset, long long *cont_len);
-
-int read_headers(Connect *req, int timeout1, int timeout2);
 //----------------------------------------------------------------------
+void get_time_run(int a, int b, struct timeval *time1, struct timeval *time2);
 void send_message(Connect *req, const char *msg, String *);
 int send_response_headers(Connect *req, String *hdrs);
 //----------------------------------------------------------------------
@@ -297,6 +304,8 @@ const char *base_name(const char *path);
 int parse_startline_request(Connect *req, char *s, int len);
 int parse_headers(Connect *req, char *s, int len);
 const char *str_err(int i);
+
+void hex_dump_stderr(const char *s, int line, const void *p, int n);
 //----------------------------------------------------------------------
 void create_logfiles(const String &, const String &);
 void close_logs(void);
@@ -306,12 +315,15 @@ void print_log(Connect *req);
 int timedwait_close_cgi(int numChld, int MaxChldsCgi);
 void cgi_dec();
 //----------------------------------------------------------------------
-void send_files(RequestManager *ReqMan);
+void end_response(Connect *req);
+
+//----------------------------------------------------------------------
+void send_files(int);
 void push_resp_queue1(Connect *res);
 void close_queue1(void);
 //----------------------------------------------------------------------
-void push_resp_queue2(Connect *req);
-void close_queue2(void);
-void queue2(RequestManager *ReqMan);
+void push_list1(Connect *req);
+void close_request(void);
+void get_request(RequestManager *ReqMan);
 
 #endif

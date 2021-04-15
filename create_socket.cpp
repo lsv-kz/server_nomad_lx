@@ -29,6 +29,11 @@ int create_server_socket(const Config *conf)
         close(sockfd);
         return -1;
     }
+    
+    if (conf->tcp_cork == 'y')
+    {
+        setsockopt(sockfd, SOL_TCP, TCP_CORK, &sock_opt, sizeof(sock_opt));
+    }
 //----------------------------------------------------------------------
     optlen = sizeof(sndbuf);
     if (getsockopt(sockfd, SOL_SOCKET, SO_SNDBUF, (void *)&sndbuf, &optlen))

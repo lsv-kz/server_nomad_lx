@@ -3,36 +3,105 @@
     //==================================================================
     void Connect::init()
     {
-        err = 0;
-        bufReq[0] = '\0';
-        decodeUri[0] = '\0';
         sRange = NULL;
         //------------------------------------
         uri = NULL;
+        p_newline = bufReq;
         tail = NULL;
-        req_hdrs.Name[0] = NULL;
-        req_hdrs.Value[0] = NULL;
         //------------------------------------
+        lenTail = 0;
+        i_bufReq = 0;
+        i_arrHdrs = 0;
         reqMethod = 0;
         httpProt = 0;
-        connKeepAlive = 0;
+    //    connKeepAlive = 0;
         
-        req_hdrs = {-1,-1,-1,-1,-1,-1,-1,-1,-1,-1, 0, -1LL};
+        req_hdrs = {-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1LL,0};
         
         resp.respStatus = 0;
-        resp.sLogTime = "";
         resp.respContentType = NULL;
-        resp.scriptType = 0;
         
         resp.countRespHeaders = 0;
         resp.send_bytes = 0LL;
         resp.numPart = 0;
         resp.scriptName = NULL;
         
-        resp.fd = -1;
         resp.offset = 0;
         resp.respContentLength = -1LL;
-        resp.fileSize = 0;
+    }
+    
+    int Connect::hd_read()
+    {
+        if (err) return -1;
+        int n = recv(clientSocket, bufReq + i_bufReq, LEN_BUF_REQUEST - i_bufReq - 1, 0);
+        if (n <= 0)
+            return -1;
+
+        lenTail += n;
+        
+        i_bufReq += n;
+        bufReq[i_bufReq] = 0;
+
+        n = empty_line();
+        if (n == 1)
+            return i_bufReq;
+        else if (n < 0)
+            return n;
+        
+        return 0;
+    }
+    
+    int Connect::empty_line()
+    {
+        if (err) return -1;
+        timeout = conf->TimeOut;
+        char *pr, *pn;
+        while (lenTail > 0)
+        {
+            pr = (char*)memchr(p_newline, '\r', lenTail - 1);
+            pn = (char*)memchr(p_newline, '\n', lenTail);
+            if (pr && pn)
+            {
+                if ((pn - pr) != 1)
+                    return -RS400;
+            
+                if ((pn - p_newline) == 1)
+                {
+                    lenTail -= (pn+1 - p_newline);
+                    if (lenTail > 0)
+                        tail = pn + 1;
+                    else
+                    {
+                        tail = NULL;
+                        lenTail = 0;
+                    }
+                
+                    return 1;
+                }
+
+                if (i_arrHdrs < MAX_HEADERS)
+                {
+                    arrHdrs[i_arrHdrs].ptr = p_newline;
+                    arrHdrs[i_arrHdrs].len = pn - p_newline + 1;
+                    ++i_arrHdrs;
+                }
+                else
+                {
+                    return -RS500;
+                }
+
+                lenTail -= (pn + 1 - p_newline);
+                p_newline = pn + 1;
+            }
+            else if (pr && (!pn))
+                return -RS400;
+            else if ((!pr) && pn)
+                return -RS400;
+            else
+                break;
+        }
+
+        return 0;
     }
 //======================================================================
 int ArrayRanges::check_ranges()

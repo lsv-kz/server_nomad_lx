@@ -572,6 +572,8 @@ int parse_startline_request(Connect *req, char *s, int len)
 /*====================================================================*/
 int parse_headers(Connect *req, char *s, int len)
 {
+    if (req->req_hdrs.countReqHeaders >= MAX_HEADERS)
+        return -RS500;
     int n;
     char *pName = s, *pVal, *p;
 
@@ -584,12 +586,12 @@ int parse_headers(Connect *req, char *s, int len)
         print_err(req, "<%s:%d> Error: ':' not found\n", __func__, __LINE__);
         return -RS400;
     }
-    *p = 0;
+    *(++p) = 0;
 
     n = strspn(p + 1, "\x20");
     pVal = p + 1 + n;
     
-    if(!strlcmp_case(pName, "connection", 32))
+    if(!strlcmp_case(pName, "connection:", 11))
     {
         req->req_hdrs.iConnection = req->req_hdrs.countReqHeaders;
         if(strstr_case(pVal, "keep-alive"))
@@ -597,11 +599,11 @@ int parse_headers(Connect *req, char *s, int len)
         else
             req->connKeepAlive = 0;
     }
-    else if(!strlcmp_case(pName, "host", 32))
+    else if(!strlcmp_case(pName, "host:", 5))
     {
         req->req_hdrs.iHost = req->req_hdrs.countReqHeaders;
     }
-    else if(!strlcmp_case(pName, "range", 32))
+    else if(!strlcmp_case(pName, "range:", 6))
     {
         char *p = strchr(pVal, '=');
         if (p)
@@ -611,41 +613,38 @@ int parse_headers(Connect *req, char *s, int len)
         
         req->req_hdrs.iRange = req->req_hdrs.countReqHeaders;
     }
-    else if(!strlcmp_case(pName, "If-Range", 32))
+    else if(!strlcmp_case(pName, "If-Range:", 9))
     {
         req->req_hdrs.iIfRange = req->req_hdrs.countReqHeaders;
     }
-    else if(!strlcmp_case(pName, "referer", 32))
+    else if(!strlcmp_case(pName, "referer:", 8))
     {
         req->req_hdrs.iReferer = req->req_hdrs.countReqHeaders;
     }
-    else if(!strlcmp_case(pName, "user-agent", 32))
+    else if(!strlcmp_case(pName, "user-agent:", 11))
     {
         req->req_hdrs.iUserAgent = req->req_hdrs.countReqHeaders;
     }
-    else if(!strlcmp_case(pName, "upgrade", 32))
+    else if(!strlcmp_case(pName, "upgrade:", 8))
     {
         req->req_hdrs.iUpgrade = req->req_hdrs.countReqHeaders;
     }
-    else if(!strlcmp_case(pName, "content-length", 32))
+    else if(!strlcmp_case(pName, "content-length:", 15))
     {
         req->req_hdrs.reqContentLength = atoll(pVal);
         req->req_hdrs.iReqContentLength = req->req_hdrs.countReqHeaders;
     }
-    else if(!strlcmp_case(pName, "content-type", 32))
+    else if(!strlcmp_case(pName, "content-type:", 13))
     {
         req->req_hdrs.iReqContentType = req->req_hdrs.countReqHeaders;
     }
-    else if(!strlcmp_case(pName, "accept-encoding", 32))
+    else if(!strlcmp_case(pName, "accept-encoding:", 16))
     {
         req->req_hdrs.iAcceptEncoding = req->req_hdrs.countReqHeaders;
     }
 
     req->req_hdrs.Name[req->req_hdrs.countReqHeaders] = pName;
     req->req_hdrs.Value[req->req_hdrs.countReqHeaders++] = pVal;
-
-    req->req_hdrs.Name[req->req_hdrs.countReqHeaders] = NULL;
-    req->req_hdrs.Value[req->req_hdrs.countReqHeaders] = NULL;
 
     return 0;
 }

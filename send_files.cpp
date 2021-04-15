@@ -6,29 +6,32 @@ using namespace std;
 static Connect *list_start = NULL;
 static Connect *list_end = NULL;
 
+static Connect *list_new_start = NULL;
+static Connect *list_new_end = NULL;
+
+static int max_resp = 100;
+
 static mutex mtx_send;
-static condition_variable cond_add;
+static condition_variable cond_add, cond_dec;
 
 static int close_thr = 0;
-static int size_list = 0;
-
-struct pollfd *fdwr;
 //======================================================================
 int send_part_file(Connect *req, char *buf, int size_buf)
 {
     int rd, wr, len;
     errno = 0;
     
+    if (req->resp.respContentLength == 0)
+        return 0;
+    
     if (req->resp.respContentLength >= size_buf)
         len = size_buf;
-    else // (int) (long long)
+    else
         len = req->resp.respContentLength;
-        
-    if (len == 0)
-        return 0;
     
     if (conf->SEND_FILE == 'y')
     {
+   //     len = req->resp.respContentLength;
         wr = sendfile(req->clientSocket, req->resp.fd, &req->resp.offset, len);
         if (wr == -1)
         {
@@ -40,6 +43,14 @@ int send_part_file(Connect *req, char *buf, int size_buf)
     }
     else
     {
+  /*      if (req->resp.respContentLength == 0)
+            return 0;
+    
+        if (req->resp.respContentLength >= size_buf)
+            len = size_buf;
+        else
+            len = req->resp.respContentLength;
+  */      
         rd = read(req->resp.fd, buf, len);
         if (rd <= 0)
         {
@@ -70,9 +81,8 @@ int send_part_file(Connect *req, char *buf, int size_buf)
     return wr;
 }
 //======================================================================
-void del_from_list(Connect *r, RequestManager *ReqMan, int i)
+void del_from_list(Connect *r)
 {
-mtx_send.lock();
     close(r->resp.fd);
     if (r->prev && r->next)
     {
@@ -93,36 +103,83 @@ mtx_send.lock();
     {
         list_start = list_end = NULL;
     }
-/*
-    if (r->clientSocket != fdwr[i].fd)
-    {
-        print_err(r, "<%s:%d> clSock = %d, .fd = %d\n", __func__, __LINE__, 
-                    r->clientSocket, fdwr[i].fd);
-        exit(8);
-    }
-*/
-    for (; (i + 1) < size_list; ++i)
-    {
-        fdwr[i] = fdwr[i + 1];
-    }
-    --size_list;
-mtx_send.unlock();
-    ReqMan->end_response(r);
+    end_response(r);
 }
 //======================================================================
-void send_files(RequestManager *ReqMan)
+int set_list(struct pollfd *fdwr)
+{
+mtx_send.lock();
+    if (list_new_start)
+    {
+        if (list_end)
+            list_end->next = list_new_start;
+        else
+            list_start = list_new_start;
+        
+        list_new_start->prev = list_end;
+        list_end = list_new_end;
+        list_new_start = list_new_end = NULL;
+    }
+mtx_send.unlock();
+    
+    int i = 0;
+    time_t t = time(NULL);
+    Connect *r = list_start, *next;
+    
+    for ( ; r; r = next)
+    {
+        next = r->next;
+        
+        if (((t - r->sock_timeout) >= conf->TimeOut) && (r->sock_timeout != 0))
+        {
+            r->err = -1;
+            print_err(r, "<%s:%d> Timeout = %ld\n", __func__, __LINE__, t - r->sock_timeout);
+            r->req_hdrs.iReferer = MAX_HEADERS - 1;
+            r->req_hdrs.Value[r->req_hdrs.iReferer] = "Timeout";
+            del_from_list(r);
+        }
+        else
+        {
+            if (r->sock_timeout == 0)
+                r->sock_timeout = t;
+            
+            fdwr[i].fd = r->clientSocket;
+            fdwr[i].events = POLLOUT;
+            ++i;
+        }
+
+        if (i >= max_resp)
+            break;
+    }
+
+    return i;
+}
+//======================================================================
+void send_files(int num_chld)
 {
     int count_resp = 0;
     int ret = 0;
     int timeout = 100;
-    int size_buf = conf->WR_BUFSIZE;
-    int num_chld = ReqMan->get_num_chld();
+    int size_buf;
+    char *rd_buf = NULL;
     
-    char *rd_buf = new (nothrow) char [size_buf];
-    fdwr = new(nothrow) struct pollfd [conf->MAX_REQUESTS];
-    if (!rd_buf || !fdwr)
+    if (conf->SEND_FILE != 'y')
     {
-        print_err("[%u]<%s:%d> Error malloc(): %s\n", num_chld, __func__, __LINE__, strerror(errno));
+        size_buf = conf->WR_BUFSIZE;
+        rd_buf = new (nothrow) char [size_buf];
+        if (!rd_buf)
+        {
+            print_err("[%d]<%s:%d> Error malloc(): %s\n", num_chld, __func__, __LINE__, strerror(errno));
+            exit(1);
+        }
+    }
+    else
+        size_buf = conf->WR_BUFSIZE;
+    
+    struct pollfd *fdwr = new(nothrow) struct pollfd [conf->MAX_REQUESTS];
+    if (!fdwr)
+    {
+        print_err("[%d]<%s:%d> Error malloc(): %s\n", num_chld, __func__, __LINE__, strerror(errno));
         exit(1);
     }
 
@@ -130,90 +187,69 @@ void send_files(RequestManager *ReqMan)
     {
         {
             unique_lock<mutex> lk(mtx_send);
-            while ((list_start == NULL) && (!close_thr))
+            while ((list_start == NULL) && (list_new_start == NULL) && (!close_thr))
             {
                 cond_add.wait(lk);
             }
-            count_resp = size_list;
+
             if (close_thr)
                 break;
         }
-
+        
+        count_resp = set_list(fdwr);
+        
         ret = poll(fdwr, count_resp, timeout);
         if (ret == -1)
         {
-            print_err("[%u] <%s:%d> Error poll(): %s\n", num_chld, __func__, __LINE__, strerror(errno));
+            print_err("[%d]<%s:%d> Error poll(): %s\n", num_chld, __func__, __LINE__, strerror(errno));
             break;
         }
-
-        if (count_resp < 50) size_buf = conf->WR_BUFSIZE;
+        else if (ret == 0)
+        {
+            continue;
+        }
+        
+        if (count_resp < 100) size_buf = conf->WR_BUFSIZE;
         Connect *r = list_start, *next;
-        time_t t = time(NULL);
-        for (int i = 0; (i < count_resp) && r; r = next)
+        for (int i = 0; (i < count_resp) && (ret > 0) && r; r = next, ++i)
         {
             next = r->next;
             if (fdwr[i].revents == POLLOUT)
             {
+                --ret;
                 int wr = send_part_file(r, rd_buf, size_buf);
                 if (wr == 0)
                 {
                     r->err = 0;
-                    del_from_list(r, ReqMan, i);
-                    count_resp--;
+                    del_from_list(r);
                 }
                 else if (wr == -1)
                 {
-            //        r->err = -1;
-                    r->connKeepAlive = 0;
-                    r->req_hdrs.iReferer = NUM_HEADERS - 1;
+                    r->err = wr;
+                    r->req_hdrs.iReferer = MAX_HEADERS - 1;
                     r->req_hdrs.Value[r->req_hdrs.iReferer] = "Connection reset by peer";
-                    del_from_list(r, ReqMan, i);
-                    count_resp--;
+                    del_from_list(r);
                 }
                 else if (wr > 0) 
                 {
-                    r->sock_timeout = t;
-                    ++i;
+                    r->sock_timeout = 0;
                 }
                 else if (wr == -EAGAIN)
                 {
                     if (size_buf > 8192) size_buf = size_buf/2;
-                    r->sock_timeout = t;
-                    ++i;
+                    r->sock_timeout = 0;
                 }
             }
             else if (fdwr[i].revents != 0)
             {
-                print_err(r, "<%s:%d> revents=0x%x\n", __func__, __LINE__, fdwr[i].revents);
-         //       r->err = -1;
-                r->connKeepAlive = 0;
-                r->req_hdrs.iReferer = NUM_HEADERS - 1;
-                r->req_hdrs.Value[r->req_hdrs.iReferer] = "Connection reset by peer";
-                del_from_list(r, ReqMan, i);
-                count_resp--;
-            }
-            else
-            {
-                if (((t - r->sock_timeout) >= conf->TimeOut) && (r->sock_timeout != 0))
-                {
-            //        r->err = -1;
-                    r->connKeepAlive = 0;
-                    print_err(r, "<%s:%d> Timeout = %ld\n", __func__, __LINE__, t - r->sock_timeout);
-                    r->req_hdrs.iReferer = NUM_HEADERS - 1;
-                    r->req_hdrs.Value[r->req_hdrs.iReferer] = "Timeout";
-                    del_from_list(r, ReqMan, i);
-                    count_resp--;
-                }
-                else
-                {
-                    if (r->sock_timeout == 0)
-                        r->sock_timeout = t;
-                    ++i;
-                }
+                --ret;
+                r->err = -1;
+                print_err("<%s:%d> Error: fdwr.revents != 0\n", __func__, __LINE__);
+                del_from_list(r);
             }
         }
     }
-
+//    print_err("[%d]<%s:%d> *** Exit send_files() ***\n", num_chld, __func__, __LINE__);
     delete [] fdwr;
     delete [] rd_buf;
 }
@@ -224,18 +260,14 @@ void push_resp_queue1(Connect *req)
     req->sock_timeout = 0;
     req->next = NULL;
 mtx_send.lock();
-    req->prev = list_end;
-    if (list_start)
+    req->prev = list_new_end;
+    if (list_new_start)
     {
-        list_end->next = req;
-        list_end = req;
+        list_new_end->next = req;
+        list_new_end = req;
     }
     else
-        list_start = list_end = req;
-    
-    fdwr[size_list].fd = req->clientSocket;
-    fdwr[size_list].events = POLLOUT;
-    ++size_list;
+        list_new_start = list_new_end = req;
 mtx_send.unlock();
     cond_add.notify_one();
 }
