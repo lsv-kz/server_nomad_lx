@@ -16,7 +16,7 @@ static int close_thr = 0;
 
 struct pollfd *fdrd;
 //======================================================================
-void del_from_list1(Connect *r)
+static void del_from_list(Connect *r)
 {
     if (r->prev && r->next)
     {
@@ -42,13 +42,13 @@ void del_from_list1(Connect *r)
 void close_conn(Connect *r, RequestManager *ReqMan)
 {
     r->err = -1;
-    del_from_list1(r);
+    del_from_list(r);
     end_response(r);
 }
 //======================================================================
 void push_list2(Connect *r, RequestManager *ReqMan)
 {
-    del_from_list1(r);
+    del_from_list(r);
     ReqMan->push_req(r);
 }
 //======================================================================

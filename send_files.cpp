@@ -81,7 +81,7 @@ int send_part_file(Connect *req, char *buf, int size_buf)
     return wr;
 }
 //======================================================================
-void del_from_list(Connect *r)
+static void del_from_list(Connect *r)
 {
     close(r->resp.fd);
     if (r->prev && r->next)
