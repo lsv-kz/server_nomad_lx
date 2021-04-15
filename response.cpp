@@ -395,7 +395,7 @@ int response2(Connect *req)
         req->resp.respContentLength = req->resp.fileSize;
     }
     //------------------------------------------------------------------
-    req->resp.fd = open(path.str(), O_RDONLY); //  | O_DIRECT
+    req->resp.fd = open(path.str(), O_RDONLY);
     if (req->resp.fd == -1)
     {
         if (errno == EACCES)
