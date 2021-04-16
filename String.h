@@ -2,7 +2,7 @@
 #define CLASS_STRING_H_
 
 #include <cstring>
-
+#include <string>
 //======================================================================
 class BaseString
 {
@@ -195,7 +195,15 @@ public:
     String & operator << (const char *s) { if (err) return *this; append(s); return *this; }
     String & operator << (char *s) { if (err) return *this; append(s); return *this; }
     String & operator << (const std::string& s) { if (err) return *this; append(s); return *this; }
-
+    
+    String & operator << (double f)
+    {
+        char s[32];
+        snprintf(s, sizeof(s), "%.02f", f);
+        *this << s;
+        return *this;
+    }
+    
     template <typename T>
     String & operator << (T t)
     {

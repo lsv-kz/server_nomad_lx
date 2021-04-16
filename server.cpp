@@ -12,11 +12,11 @@ static void signal_handler(int sig)
 {
     if (sig == SIGINT)
     {
-        print_err("<main:%s:%d> ####### SIGINT #######\n", __func__, __LINE__);
+        print_err("<main> ####### SIGINT #######\n");
     }
     else if (sig == SIGSEGV)
     {
-        print_err("<main:%s:%d> ####### SIGSEGV #######\n", __func__, __LINE__);
+        print_err("<main> ####### SIGSEGV #######\n");
         exit(1);
     }
     else
@@ -187,7 +187,7 @@ pid_t create_child(int num_chld)
                 exit(1);
             }
             
-            if (setuid(conf->server_gid) == -1) // server_uid
+            if (setuid(conf->server_gid) == -1)
             {
                 perror("setuid");
                 cout << "[" << __func__ << "] Error setuid(" << conf->server_uid << "): " << strerror(errno) << "\n";
@@ -197,9 +197,7 @@ pid_t create_child(int num_chld)
         }
         
         manager(sockServer, num_chld);
-
         close_logs();
-        
         exit(0);
     }
     else if (pid < 0)

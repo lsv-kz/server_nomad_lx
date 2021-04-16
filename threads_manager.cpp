@@ -9,8 +9,8 @@ static int count_conn = 0;
 //======================================================================
 RequestManager::RequestManager(int n)
 {
-    list2_start = list2_end = NULL;
-    size_list2 = stop_manager = all_thr = 0;
+    list_start = list_end = NULL;
+    size_list = stop_manager = all_thr = 0;
     count_thr = num_wait_thr = 0;
     numChld = n;
 }
@@ -58,16 +58,16 @@ void RequestManager::push_req(Connect *req)
 {
 mtx_thr.lock();
     req->next = NULL;
-    req->prev = list2_end;
-    if (list2_start)
+    req->prev = list_end;
+    if (list_start)
     {
-        list2_end->next = req;
-        list2_end = req;
+        list_end->next = req;
+        list_end = req;
     }
     else
-        list2_start = list2_end = req;
+        list_start = list_end = req;
 
-    ++size_list2;
+    ++size_list;
 mtx_thr.unlock();
     cond_list.notify_one();
 }
@@ -76,21 +76,21 @@ Connect *RequestManager::pop_req()
 {
 unique_lock<mutex> lk(mtx_thr);
     ++num_wait_thr;
-    while (list2_start == NULL)
+    while (list_start == NULL)
     {
         cond_list.wait(lk);
     }
     --num_wait_thr;
-    Connect *req = list2_start;
-    if (list2_start->next)
+    Connect *req = list_start;
+    if (list_start->next)
     {
-        list2_start->next->prev = NULL;
-        list2_start = list2_start->next;
+        list_start->next->prev = NULL;
+        list_start = list_start->next;
     }
     else
-        list2_start = list2_end = NULL;
+        list_start = list_end = NULL;
     
-    --size_list2;
+    --size_list;
     if (num_wait_thr <= 1)
         cond_new_thr.notify_one();
 
@@ -113,7 +113,7 @@ int RequestManager::end_thr(int ret)
 {
 mtx_thr.lock();
     
-    if (((count_thr > conf->MinThreads) && (size_list2 <= num_wait_thr)) || ret)
+    if (((count_thr > conf->MinThreads) && (size_list <= num_wait_thr)) || ret)
     {
         --count_thr;
         ret = EXIT_THR;
@@ -191,8 +191,8 @@ void end_response(Connect *req)
 void RequestManager::print_intr()
 {
 mtx_thr.lock();
-    print_err("[%d]<%s:%d> thr=%d, conn=%d, qu=%d, num_wait_thr=%d\n", numChld, __func__, __LINE__, 
-                                count_thr, count_conn, size_list2, num_wait_thr);
+    print_err("[%d]<%s:%d> thr=%d, open_conn=%d, qu=%d, num_wait_thr=%d\n", numChld, __func__, __LINE__, 
+                                count_thr, count_conn, size_list, num_wait_thr);
 mtx_thr.unlock();
 }
 //======================================================================
@@ -408,7 +408,7 @@ void manager(int sockServer, int numChld)
     thrReqMan.join();
 
     n = ReqMan->get_num_thr();
-    print_err("[%d] <%s:%d>  numThr=%d; allNumThr=%u; allConn=%u; num_conn=%d\n", numChld, 
+    print_err("[%d] <%s:%d>  numThr=%d; allNumThr=%u; allConn=%u; open_conn=%d\n", numChld, 
                     __func__, __LINE__, n, ReqMan->get_all_thr(), allConn, get_num_conn());
 
     while (n)

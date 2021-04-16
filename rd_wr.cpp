@@ -71,7 +71,6 @@ int read_timeout(int fd, char *buf, int len, int timeout)
         ret = poll(&fdrd, 1, tm);
         if (ret == -1)
         {
-            print_err("<%s:%d> Error poll(): %s\n", __func__, __LINE__, strerror(errno));
             if (errno == EINTR)
                 continue;
             return -1;
@@ -88,10 +87,7 @@ int read_timeout(int fd, char *buf, int len, int timeout)
                 return -1;
             }
             else if (ret == 0)
-            {
- //   print_err("<%s:%d> read()=0\n", __func__, __LINE__);
                 break;
-            }
             else
             {
                 p += ret;
@@ -100,15 +96,9 @@ int read_timeout(int fd, char *buf, int len, int timeout)
             }
         }
         else if (fdrd.revents & POLLHUP)
-        {
- //   print_err("<%s:%d>***** POLLHUP *****0x%02x\n", __func__, __LINE__, fdrd.revents);
             break;
-        }
-        else if (fdrd.revents & POLLERR)
-        {
-            print_err("<%s:%d> POLLERR fdrd.revents = 0x%02x\n", __func__, __LINE__, fdrd.revents);
+        else
             return -1;
-        }
     }
 
     return read_bytes;
@@ -431,151 +421,4 @@ int send_largefile(Connect *req, char *buf, int size, off_t offset, long long *c
     }
 
     return 0;
-}
-//======================================================================
-int check_req(Connect *req, char *s, char **p_newline, int *len, int *start)
-{
-    char *pr, *pn;
-    
-    while (*len > 0)
-    {
-        pr = (char*)memchr(*p_newline, '\r', *len - 1);
-        pn = (char*)memchr(*p_newline, '\n', *len);
-        if (pr && pn)
-        {
-            if ((pn - pr) != 1)
-                return -RS400;
-            
-            if ((pn - *p_newline) == 1)
-            {
-                *len -= (pn+1 - *p_newline);
-                if (*len > 0)
-                {
-                    req->tail = pn + 1;
-                    req->lenTail = *len;
-                }
-                else
-                    req->tail = NULL;
-                
-                return 1;
-            }
-            
-            int n = pn - *p_newline + 1;
-            if (!(*start))
-            {
-//hex_dump_stderr(req->resp.sLogTime.c_str(), req->numConn, *p_newline, n);
-                int ret = parse_startline_request(req, *p_newline, n);
-                if (ret)
-                {
-                    print_err(req, "<%s:%d>  Error parse_startline_request(): %d\n", __func__, __LINE__, ret);
-                    return ret;
-                }
-                *start = 1;
-            }
-            else
-            {
-                int ret = parse_headers(req, *p_newline, n);
-                if (ret < 0)
-                {
-                    print_err(req, "<%s:%d>  Error parse_headers(): %d\n", __func__, __LINE__, ret);
-                    return ret;
-                }
-            }
-            
-            *len -= (pn+1 - *p_newline);
-            *p_newline = pn + 1;
-        }
-        else if (pr && (!pn))
-        {
-            return -RS400;
-        }
-        else if ((!pr) && pn)
-        {
-            return -RS400;
-        }
-        else
-        {
-            break;
-        }
-    }
-
-    return 0;
-}
-//======================================================================
-int read_headers(Connect *req, int timeout1, int timeout2)
-{
-    int all_rd = 0, ret = -1;
-    int startline = 0, len_tail = 0;
-    int len_buf = sizeof(req->bufReq) - 1;
-    char *p, *p_newline;
-    struct pollfd fdrd;
-    int timeout = timeout1;
-    
-    get_time(req->resp.sLogTime);
-    
-    p = p_newline = req->bufReq;
-    
-    fdrd.fd = req->clientSocket;
-    fdrd.events = POLLIN;
-    while (1)
-    {
-        ret = poll(&fdrd, 1, timeout * 1000);
-        if (ret == -1)
-        {
-            print_err(req, "<%s:%d> Error poll()=-1: %s\n", __func__, __LINE__, strerror(errno));
-            if (errno == EINTR)
-                continue;
-            break;
-        }
-        else if (!ret)
-        {
-            print_err(req, "<%s:%d> Timeout=%d\n", __func__, __LINE__, timeout);
-            return -1000;
-        }
-        timeout = timeout2;
-        
-        if (!(fdrd.revents & POLLIN))
-        {
-            print_err(req, "<%s:%d> fdrd.revents != POLLIN: 0x%02x\n", __func__, __LINE__, fdrd.revents);
-            return -1;
-        }
-
-        ret = recv(req->clientSocket, p, len_buf, 0);
-        if (ret < 0)
-        {
-            if (errno == EAGAIN)
-                continue;
-            print_err(req, "<%s:%d> Error recv() = %d: %s\n", __func__, __LINE__, ret, strerror(errno));
-            return -1;
-        }
-        else if (ret == 0)
-        {
-    //        print_err(req, "<%s:%d> Error recv()=0; %d; %s\n", __func__, __LINE__, len_buf, req->bufReq);
-            return ret;
-        }
-
-        all_rd += ret;
-        *(p + ret) = 0;
-//hex_dump_stderr(__func__, __LINE__, req->bufReq, all_rd);
-        len_tail += ret;
-        int n = check_req(req, p, &p_newline, &len_tail, &startline);
-        if (n == 1)
-        {
-            return all_rd;
-        }
-        else if (n < 0)
-        {
-            return n;
-        }
-        
-        p += ret;
-        len_buf -= ret;
-        if (len_buf <= 0)
-        {
-            print_err(req, "<%s:%d> Error len_buf=0\n", __func__, __LINE__);
-            return -RS414;
-        }
-    }
-
-    return ret;
 }

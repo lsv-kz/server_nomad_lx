@@ -5,7 +5,6 @@ using namespace std;
 static Connect *list_start = NULL;
 static Connect *list_end = NULL;
 
-
 static Connect *list_new_start = NULL;
 static Connect *list_new_end = NULL;
 
@@ -13,7 +12,6 @@ static mutex mtx_req;
 static condition_variable cond_add;
 
 static int close_thr = 0;
-
 struct pollfd *fdrd;
 //======================================================================
 static void del_from_list(Connect *r)
@@ -39,7 +37,7 @@ static void del_from_list(Connect *r)
     }
 }
 //======================================================================
-void close_conn(Connect *r, RequestManager *ReqMan)
+void close_conn(Connect *r)
 {
     r->err = -1;
     del_from_list(r);
@@ -52,7 +50,7 @@ void push_list2(Connect *r, RequestManager *ReqMan)
     ReqMan->push_req(r);
 }
 //======================================================================
-int set_list1(RequestManager *ReqMan, struct pollfd *fdwr)
+static int set_list(RequestManager *ReqMan, struct pollfd *fdwr)
 {
 mtx_req.lock();
     if (list_new_start)
@@ -79,7 +77,7 @@ mtx_req.unlock();
         if (((t - r->sock_timeout) >= r->timeout) && (r->sock_timeout != 0))
         {
             print_err(r, "<%s:%d> Timeout = %ld\n", __func__, __LINE__, t - r->sock_timeout);
-            close_conn(r, ReqMan);
+            close_conn(r);
         }
         else
         {
@@ -122,7 +120,7 @@ void get_request(RequestManager *ReqMan)
                 break;
         }
         
-        count_resp = set_list1(ReqMan, fdrd);
+        count_resp = set_list(ReqMan, fdrd);
 
         ret = poll(fdrd, count_resp, timeout); 
         if (ret == -1)
@@ -145,7 +143,7 @@ void get_request(RequestManager *ReqMan)
                 int ret = r->hd_read();
                 if (ret < 0)
                 {
-                    close_conn(r, ReqMan);
+                    close_conn(r);
                 }
                 else if (ret > 0)
                     push_list2(r, ReqMan);
@@ -154,7 +152,7 @@ void get_request(RequestManager *ReqMan)
             {
                 --ret;
                 print_err("<%s:%d> Error: fdwr.revents != 0\n", __func__, __LINE__);
-                close_conn(r, ReqMan);
+                close_conn(r);
             }
         }
     }

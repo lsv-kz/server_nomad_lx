@@ -94,7 +94,6 @@ struct Config
     char SEND_FILE = 'n';
     
     int MAX_REQUESTS = 256;
-    int MAX_FD;
 
     char KeepAlive = 'y';
     int TimeoutKeepAlive = 5;
@@ -216,15 +215,15 @@ public:
 class RequestManager
 {
 private:
-    Connect *list2_start;
-    Connect *list2_end;
+    Connect *list_start;
+    Connect *list_end;
 
     std::mutex mtx_thr;
     
     std::condition_variable cond_list;
     std::condition_variable cond_new_thr, cond_exit_thr;
     
-    int num_wait_thr, size_list2;
+    int num_wait_thr, size_list;
     int count_thr, stop_manager;
     
     int numChld;
@@ -304,8 +303,6 @@ const char *base_name(const char *path);
 int parse_startline_request(Connect *req, char *s, int len);
 int parse_headers(Connect *req, char *s, int len);
 const char *str_err(int i);
-
-void hex_dump_stderr(const char *s, int line, const void *p, int n);
 //----------------------------------------------------------------------
 void create_logfiles(const String &, const String &);
 void close_logs(void);

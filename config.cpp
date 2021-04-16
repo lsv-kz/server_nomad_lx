@@ -348,7 +348,7 @@ void read_conf_file(const char *path_conf)
             
             if (setrlimit(RLIMIT_NOFILE, &lim) == -1)
                 print_err("<%s:%d> Error setrlimit(RLIMIT_NOFILE): %s\n", __func__, __LINE__, strerror(errno));
-            max_fd = sysconf(_SC_OPEN_MAX);
+            max_fd = (long)sysconf(_SC_OPEN_MAX);
             if (max_fd > 1)
             {
                 print_err("<%s:%d> _SC_OPEN_MAX=%d\n", __func__, __LINE__, max_fd);

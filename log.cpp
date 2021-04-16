@@ -116,10 +116,8 @@ void print_log(Connect *req)
     ss << req->numChld << "/" << req->numConn << "/" << req->numReq << " - " << req->remoteAddr << ":" << req->remotePort
             << " - [" << req->resp.sLogTime << "] - ";
     if (req->reqMethod > 0)
-    {
             ss << "\"" << get_str_method(req->reqMethod) << " " << req->uri
                << " " << get_str_http_prot(req->httpProt) << "\" ";
-    }
     else
             ss << "\"-\" ";
         
