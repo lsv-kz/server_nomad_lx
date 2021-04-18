@@ -127,7 +127,7 @@ struct Config
 };
 //----------------------------------------------------------------------
 extern const Config* const conf;
-//----------------------------------------------------------------------
+//======================================================================
 struct hdr {
     char *ptr;
     int len;
@@ -143,7 +143,7 @@ public:
     unsigned int numConn, numReq;
     int       numChld, clientSocket;
     int       err;
-    time_t    sock_timeout;
+    time_t    sock_timer;
     int       timeout;
     
     char      remoteAddr[NI_MAXHOST];

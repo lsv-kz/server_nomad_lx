@@ -74,15 +74,15 @@ mtx_req.unlock();
     {
         next = r->next;
         
-        if (((t - r->sock_timeout) >= r->timeout) && (r->sock_timeout != 0))
+        if (((t - r->sock_timer) >= r->timeout) && (r->sock_timer != 0))
         {
-            print_err(r, "<%s:%d> Timeout = %ld\n", __func__, __LINE__, t - r->sock_timeout);
+            print_err(r, "<%s:%d> Timeout = %ld\n", __func__, __LINE__, t - r->sock_timer);
             close_conn(r);
         }
         else
         {
-            if (r->sock_timeout == 0)
-                r->sock_timeout = t;
+            if (r->sock_timer == 0)
+                r->sock_timer = t;
             
             fdrd[i].fd = r->clientSocket;
             fdrd[i].events = POLLIN;
@@ -164,7 +164,7 @@ void get_request(RequestManager *ReqMan)
 void push_list1(Connect *req)
 {
     req->init();
-    req->sock_timeout = 0;
+    req->sock_timer = 0;
     req->next = NULL;
 mtx_req.lock();
     req->prev = list_new_end;

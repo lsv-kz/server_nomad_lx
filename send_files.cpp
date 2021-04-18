@@ -130,18 +130,18 @@ mtx_send.unlock();
     {
         next = r->next;
         
-        if (((t - r->sock_timeout) >= conf->TimeOut) && (r->sock_timeout != 0))
+        if (((t - r->sock_timer) >= conf->TimeOut) && (r->sock_timer != 0))
         {
             r->err = -1;
-            print_err(r, "<%s:%d> Timeout = %ld\n", __func__, __LINE__, t - r->sock_timeout);
+            print_err(r, "<%s:%d> Timeout = %ld\n", __func__, __LINE__, t - r->sock_timer);
             r->req_hdrs.iReferer = MAX_HEADERS - 1;
             r->req_hdrs.Value[r->req_hdrs.iReferer] = "Timeout";
             del_from_list(r);
         }
         else
         {
-            if (r->sock_timeout == 0)
-                r->sock_timeout = t;
+            if (r->sock_timer == 0)
+                r->sock_timer = t;
             
             fdwr[i].fd = r->clientSocket;
             fdwr[i].events = POLLOUT;
@@ -232,12 +232,12 @@ void send_files(int num_chld)
                 }
                 else if (wr > 0) 
                 {
-                    r->sock_timeout = 0;
+                    r->sock_timer = 0;
                 }
                 else if (wr == -EAGAIN)
                 {
                     if (size_buf > 8192) size_buf = size_buf/2;
-                    r->sock_timeout = 0;
+                    r->sock_timer = 0;
                 }
             }
             else if (fdwr[i].revents != 0)
@@ -257,7 +257,7 @@ void send_files(int num_chld)
 void push_resp_queue1(Connect *req)
 {
     lseek(req->resp.fd, req->resp.offset, SEEK_SET);
-    req->sock_timeout = 0;
+    req->sock_timer = 0;
     req->next = NULL;
 mtx_send.lock();
     req->prev = list_new_end;
