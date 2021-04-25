@@ -9,8 +9,6 @@ static Connect *list_end = NULL;
 static Connect *list_new_start = NULL;
 static Connect *list_new_end = NULL;
 
-static int max_resp = 100;
-
 static mutex mtx_send;
 static condition_variable cond_add, cond_dec;
 
@@ -31,7 +29,6 @@ int send_part_file(Connect *req, char *buf, int size_buf)
     
     if (conf->SEND_FILE == 'y')
     {
-   //     len = req->resp.respContentLength;
         wr = sendfile(req->clientSocket, req->resp.fd, &req->resp.offset, len);
         if (wr == -1)
         {
@@ -43,14 +40,6 @@ int send_part_file(Connect *req, char *buf, int size_buf)
     }
     else
     {
-  /*      if (req->resp.respContentLength == 0)
-            return 0;
-    
-        if (req->resp.respContentLength >= size_buf)
-            len = size_buf;
-        else
-            len = req->resp.respContentLength;
-  */      
         rd = read(req->resp.fd, buf, len);
         if (rd <= 0)
         {
@@ -147,9 +136,6 @@ mtx_send.unlock();
             fdwr[i].events = POLLOUT;
             ++i;
         }
-
-        if (i >= max_resp)
-            break;
     }
 
     return i;
@@ -254,7 +240,7 @@ void send_files(int num_chld)
     delete [] rd_buf;
 }
 //======================================================================
-void push_resp_queue1(Connect *req)
+void push_send_list(Connect *req)
 {
     lseek(req->resp.fd, req->resp.offset, SEEK_SET);
     req->sock_timer = 0;
@@ -272,7 +258,7 @@ mtx_send.unlock();
     cond_add.notify_one();
 }
 //======================================================================
-void close_queue1(void)
+void close_send_list(void)
 {
     close_thr = 1;
     cond_add.notify_one();

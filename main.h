@@ -316,10 +316,10 @@ void end_response(Connect *req);
 
 //----------------------------------------------------------------------
 void send_files(int);
-void push_resp_queue1(Connect *res);
-void close_queue1(void);
+void push_send_list(Connect *res);
+void close_send_list(void);
 //----------------------------------------------------------------------
-void push_list1(Connect *req);
+void push_req_list(Connect *req);
 void close_request(void);
 void get_request(RequestManager *ReqMan);
 

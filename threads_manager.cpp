@@ -167,7 +167,7 @@ void end_response(Connect *req)
     }
     
     if (req->connKeepAlive == 0 || req->err < 0)
-    {
+    { // --- Close ---
         if (req->err == 0)
             print_log(req);
         //----------------- close connect ------------------------------
@@ -180,11 +180,11 @@ void end_response(Connect *req)
         cond_close_conn.notify_all();
     }
     else
-    {
+    { // --- KeepAlive ---
         print_log(req);
         req->timeout = conf->TimeoutKeepAlive;
         ++req->numReq;
-        push_list1(req);
+        push_req_list(req);
     }
 }
 //======================================================================
@@ -401,7 +401,7 @@ void manager(int sockServer, int numChld)
                     NI_NUMERICHOST | NI_NUMERICSERV);
 
         start_conn();
-        push_list1(req);
+        push_req_list(req);
     }
 
     ReqMan->close_manager();
@@ -424,7 +424,7 @@ void manager(int sockServer, int numChld)
         --n;
     }
     
-    close_queue1();
+    close_send_list();
     SendFile.join();
     
     close_request();

@@ -161,7 +161,7 @@ void get_request(RequestManager *ReqMan)
     delete [] fdrd;
 }
 //======================================================================
-void push_list1(Connect *req)
+void push_req_list(Connect *req)
 {
     req->init();
     req->sock_timer = 0;

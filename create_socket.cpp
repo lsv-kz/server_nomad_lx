@@ -29,11 +29,6 @@ int create_server_socket(const Config *conf)
         close(sockfd);
         return -1;
     }
-    
-    if (conf->tcp_cork == 'y')
-    {
-        setsockopt(sockfd, SOL_TCP, TCP_CORK, &sock_opt, sizeof(sock_opt));
-    }
 //----------------------------------------------------------------------
     optlen = sizeof(sndbuf);
     if (getsockopt(sockfd, SOL_SOCKET, SO_SNDBUF, (void *)&sndbuf, &optlen))
@@ -58,8 +53,7 @@ int create_server_socket(const Config *conf)
         return -1;
     }*/
     server_sockaddr.sin_addr.s_addr = inet_addr(conf->host.str());
-//  server_sockaddr.sin_addr.s_addr = htonl(INADDR_ANY);
-
+    
     if (bind(sockfd, (struct sockaddr *) &server_sockaddr, sizeof (server_sockaddr)) == -1)
     {
         int err = errno;

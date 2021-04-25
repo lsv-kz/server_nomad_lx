@@ -41,6 +41,12 @@ void response1(RequestManager *ReqMan)
                 goto end;
             }
         }
+        
+        if (conf->tcp_cork == 'y')
+        {
+            int optval = 1;
+            setsockopt(req->clientSocket, SOL_TCP, TCP_CORK, &optval, sizeof(optval));
+        }
         /*--------------------------------------------------------*/
         if ((req->httpProt != HTTP10) && (req->httpProt != HTTP11))
         {
@@ -439,7 +445,7 @@ int response2(Connect *req)
         return 0;
     }
 
-    push_resp_queue1(req);
+    push_send_list(req);
 
     return 1;
 }
