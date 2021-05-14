@@ -23,12 +23,17 @@ int create_server_socket(const Config *conf)
         return -1;
     }
 
-    if (setsockopt(sockfd, IPPROTO_TCP, TCP_NODELAY, (void *)&sock_opt, sizeof(sock_opt)))
+    if (conf->TcpNoDelay == 'y')
     {
-        print_err("<%s:%d> setsockopt: unable to set TCP_NODELAY: %s\n", __func__, __LINE__, strerror(errno));
-        close(sockfd);
-        return -1;
+        if (setsockopt(sockfd, IPPROTO_TCP, TCP_NODELAY, (void *)&sock_opt, sizeof(sock_opt)))
+        {
+            print_err("<%s:%d> setsockopt: unable to set TCP_NODELAY: %s\n", __func__, __LINE__, strerror(errno));
+            close(sockfd);
+            return -1;
+        }
     }
+    
+    ioctl(sockfd, FIONBIO, &sock_opt);
 //----------------------------------------------------------------------
     optlen = sizeof(sndbuf);
     if (getsockopt(sockfd, SOL_SOCKET, SO_SNDBUF, (void *)&sndbuf, &optlen))

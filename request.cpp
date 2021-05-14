@@ -40,6 +40,7 @@ static void del_from_list(Connect *r)
 void close_conn(Connect *r)
 {
     r->err = -1;
+    r->connKeepAlive = 0;
     del_from_list(r);
     end_response(r);
 }
@@ -50,7 +51,7 @@ void push_list2(Connect *r, RequestManager *ReqMan)
     ReqMan->push_req(r);
 }
 //======================================================================
-static int set_list(RequestManager *ReqMan, struct pollfd *fdwr)
+static int set_list(struct pollfd *fdwr)
 {
 mtx_req.lock();
     if (list_new_start)
@@ -120,7 +121,7 @@ void get_request(RequestManager *ReqMan)
                 break;
         }
         
-        count_resp = set_list(ReqMan, fdrd);
+        count_resp = set_list(fdrd);
 
         ret = poll(fdrd, count_resp, timeout); 
         if (ret == -1)
@@ -133,26 +134,27 @@ void get_request(RequestManager *ReqMan)
             continue;
         }
 
-        Connect *r = list_start, *next;
-        for (int i = 0; (i < count_resp) && (ret > 0) && r; r = next, ++i)
+        Connect *req = list_start;
+        Connect *next;
+        for (int i = 0; (i < count_resp) && (ret > 0) && req; req = next, ++i)
         {
-            next = r->next;
+            next = req->next;
             if (fdrd[i].revents == POLLIN)
             {
                 --ret;
-                int ret = r->hd_read();
+                int ret = req->hd_read();
                 if (ret < 0)
                 {
-                    close_conn(r);
+                    close_conn(req);
                 }
                 else if (ret > 0)
-                    push_list2(r, ReqMan);
+                    push_list2(req, ReqMan);
             }
             else if (fdrd[i].revents)
             {
                 --ret;
                 print_err("<%s:%d> Error: fdwr.revents != 0\n", __func__, __LINE__);
-                close_conn(r);
+                close_conn(req);
             }
         }
     }

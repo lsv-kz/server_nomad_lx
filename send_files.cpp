@@ -146,12 +146,11 @@ void send_files(int num_chld)
     int count_resp = 0;
     int ret = 0;
     int timeout = 100;
-    int size_buf;
+    int size_buf = conf->WR_BUFSIZE;
     char *rd_buf = NULL;
     
     if (conf->SEND_FILE != 'y')
     {
-        size_buf = conf->WR_BUFSIZE;
         rd_buf = new (nothrow) char [size_buf];
         if (!rd_buf)
         {
@@ -159,8 +158,6 @@ void send_files(int num_chld)
             exit(1);
         }
     }
-    else
-        size_buf = conf->WR_BUFSIZE;
     
     struct pollfd *fdwr = new(nothrow) struct pollfd [conf->MAX_REQUESTS];
     if (!fdwr)
@@ -237,7 +234,8 @@ void send_files(int num_chld)
     }
 //    print_err("[%d]<%s:%d> *** Exit send_files() ***\n", num_chld, __func__, __LINE__);
     delete [] fdwr;
-    delete [] rd_buf;
+    if (conf->SEND_FILE != 'y')
+        delete [] rd_buf;
 }
 //======================================================================
 void push_send_list(Connect *req)

@@ -9,12 +9,13 @@
         p_newline = bufReq;
         tail = NULL;
         //------------------------------------
+        err = 0;
         lenTail = 0;
         i_bufReq = 0;
         i_arrHdrs = 0;
         reqMethod = 0;
         httpProt = 0;
-    //    connKeepAlive = 0;
+        connKeepAlive = 0;
         
         req_hdrs = {-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1LL,0};
         

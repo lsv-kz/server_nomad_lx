@@ -433,53 +433,41 @@ end:
 /*====================================================================*/
 int clean_path(char *path)
 {
-    int slash = 0, comma = 0, cnt = 0;
-    char *p = path, ch;
+    int i = 0, o = 0;
+    char ch;
 
-    while((ch = *path))
+    while ((ch = *(path + o)))
     {
-        if(ch == '/')
+        if (!memcmp(path+o, "/../", 4))
         {
-            if (!slash)
+            if (i != 0)
             {
-                *p++ = *path++;
-                slash = 1;
-                ++cnt;
+                for (--i; i > 0; --i)
+                {
+                    if (*(path + i) == '/')
+                        break;
+                }
             }
-            else path++;
-            comma = 0;
+            o += 3;
         }
-        else if (ch == '.')
-        {
-            if (comma && slash)
-            {
-                *p = 0;
-                return 0;
-            }
-
-            comma = 1;
-            
-            if (slash) path++;
-            else
-            {
-                *p++ = *path++;
-                ++cnt;
-            }
-        }
+        else if (!memcmp(path+o, "//", 2))
+            o += 1;
+        else if (!memcmp(path+o, "/./", 3))
+            o += 2;
         else
         {
-            if (comma && slash)
-            {
-                *p = 0;
-                return 0;
-            }
-            *p++ = *path++;
-            slash = comma = 0;
-            ++cnt;
+            if (!memcmp(path+o, "/.", 2))
+                return -RS404;
+            if (o != i)
+                *(path + i) = ch;
+            ++i;
+            ++o;
         }
     }
-    *p = 0;
-    return cnt;
+    
+    *(path + i) = 0;
+
+    return i;
 }
 //======================================================================
 const char *base_name(const char *path)

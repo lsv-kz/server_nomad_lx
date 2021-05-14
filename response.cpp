@@ -7,6 +7,7 @@ void response1(RequestManager *ReqMan)
 {
     const char *p;
     Connect *req;
+    int err;
 
     while(1)
     {
@@ -21,7 +22,7 @@ void response1(RequestManager *ReqMan)
         {
             ReqMan->end_thr(1);
             delete req;
-            continue;
+            return;
         }
         /*------------------------------------------------------------*/
         get_time(req->resp.sLogTime);
@@ -86,7 +87,14 @@ void response1(RequestManager *ReqMan)
             req->err = -RS404;
             goto end;
         }
-        clean_path(req->decodeUri);
+        
+        err = clean_path(req->decodeUri);
+        if (err < 0)
+        {
+            req->err = err;
+            goto end;
+        }
+        
         req->lenDecodeUri = strlen(req->decodeUri);
 
         if (strstr(req->uri, ".php") && (conf->UsePHP != "php-cgi") && (conf->UsePHP != "php-fpm"))

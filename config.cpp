@@ -51,7 +51,7 @@ int create_conf_file(const char *path)
     fconf << "ServerSoftware   " << "x" << "\n";
     
     fconf << "tcp_cork   " << c.tcp_cork << "\n";
-    
+    fconf << "TcpNoDelay   y\n\n";
     fconf << "DocumentRoot " << c.rootDir.str() << "\n";
     fconf << "ScriptPath   " << c.cgiDir.str() << "\n";
     fconf << "LogPath      " << c.logDir.str() << "\n\n";
@@ -170,6 +170,8 @@ void read_conf_file(const char *path_conf)
             ss >> c.ServerSoftware;
         else if (s == "tcp_cork")
             ss >> c.tcp_cork;
+        else if (s == "TcpNoDelay")
+            ss >> c.TcpNoDelay;
         else if (s == "DocumentRoot")
             ss >> c.rootDir;
         else if (s == "ScriptPath")
@@ -338,7 +340,7 @@ void read_conf_file(const char *path_conf)
     else
     {
         printf("<%s:%d> lim.rlim_max=%lu, lim.rlim_cur=%lu\n", __func__, __LINE__, (unsigned long)lim.rlim_max, (unsigned long)lim.rlim_cur);
-        long max_fd = (c.MAX_REQUESTS * 2) + 6;
+        long max_fd = (c.MAX_REQUESTS * 2) + 9;
         if (max_fd > (long)lim.rlim_cur)
         {
             if (max_fd > (long)lim.rlim_max)
@@ -352,7 +354,7 @@ void read_conf_file(const char *path_conf)
             if (max_fd > 1)
             {
                 print_err("<%s:%d> _SC_OPEN_MAX=%d\n", __func__, __LINE__, max_fd);
-                c.MAX_REQUESTS = (max_fd - 6)/2;
+                c.MAX_REQUESTS = (max_fd - 9)/2;
                 printf("<%s:%d> MaxRequests=%d, _SC_OPEN_MAX=%ld\n", __func__, __LINE__, c.MAX_REQUESTS, max_fd);
             }
             else

@@ -158,42 +158,44 @@ unique_lock<mutex> lk(mtx_conn);
     return 0;
 }
 //======================================================================
+static int fd_close_conn;
+static int nChld;
+//----------------------------------------------------------------------
 void end_response(Connect *req)
 {
-    if (conf->tcp_cork == 'y')
-    {
-        int optval = 0;
-        setsockopt(req->clientSocket, SOL_TCP, TCP_CORK, &optval, sizeof(optval));
-    }
-    
     if (req->connKeepAlive == 0 || req->err < 0)
-    { // --- Close ---
+    { // ----- Close connect -----
         if (req->err == 0)
             print_log(req);
-        //----------------- close connect ------------------------------
         shutdown(req->clientSocket, SHUT_RDWR);
         close(req->clientSocket);
+        
         delete req;
     mtx_conn.lock();
         --count_conn;
     mtx_conn.unlock();
+        char ch = nChld;
+        if (write(fd_close_conn, &ch, 1) <= 0)
+        {
+            print_err("<%s:%d> Error write(): %s\n", __func__, __LINE__, strerror(errno));
+            exit(1);
+        }
+        
         cond_close_conn.notify_all();
     }
     else
-    { // --- KeepAlive ---
+    { // ----- KeepAlive -----
+        if (conf->tcp_cork == 'y')
+        {
+            int optval = 0;
+            setsockopt(req->clientSocket, SOL_TCP, TCP_CORK, &optval, sizeof(optval));
+        }
+        
         print_log(req);
         req->timeout = conf->TimeoutKeepAlive;
         ++req->numReq;
         push_req_list(req);
     }
-}
-//======================================================================
-void RequestManager::print_intr()
-{
-mtx_thr.lock();
-    print_err("[%d]<%s:%d> thr=%d, open_conn=%d, qu=%d, num_wait_thr=%d\n", numChld, __func__, __LINE__, 
-                                count_thr, count_conn, size_list, num_wait_thr);
-mtx_thr.unlock();
 }
 //======================================================================
 void thr_create_manager(int numProc, RequestManager *ReqMan)
@@ -220,27 +222,32 @@ void thr_create_manager(int numProc, RequestManager *ReqMan)
 
         ReqMan->start_thr();
     }
-//    print_err("[%d] <%s:%d> Exit thread_req_manager()\n", numProc, __func__, __LINE__);
+//    print_err("[%d] <%s:%d> *** Exit thread_req_manager() ***\n", numProc, __func__, __LINE__);
 }
 //======================================================================
-static int nChld, num_c = 0;
 int servSock;
 RequestManager *RM;
 unsigned long allConn = 0;
+//======================================================================
+void RequestManager::print_intr()
+{
+mtx_thr.lock();
+    print_err("[%d]<%s:%d> thr=%d, open_conn=%d, qu=%d, num_wait_thr=%d\n", numChld, __func__, __LINE__, 
+                                count_thr, count_conn, size_list, num_wait_thr);
+mtx_thr.unlock();
+}
 //======================================================================
 static void signal_handler(int sig)
 {
     if (sig == SIGINT)
     {
   //      RM->print_intr();
-        print_err("[%d] <%s:%d> ### SIGINT ### all_conn=%d\n", nChld, __func__, __LINE__, num_c);
+        print_err("[%d] <%s:%d> ### SIGINT ### all_conn=%d\n", nChld, __func__, __LINE__, allConn);
         shutdown(servSock, SHUT_RDWR);
         close(servSock);
-        
     }
     else if (sig == SIGSEGV)
     {
-        RM->print_intr();
         print_err("[%d] <%s:%d> ### SIGSEGV ###\n", nChld, __func__, __LINE__);
         exit(1);
     }
@@ -250,8 +257,21 @@ Connect *create_req(void);
 static int sys_sndbufsize = 0;
 void set_sndbuf(int n); 
 //======================================================================
-void manager(int sockServer, int numChld)
+void manager(int sockServer, int numChld, int pfd)
 {
+    String nameFifo;
+    nameFifo << "./fifo_" << numChld;
+    int fifoFD;
+    if ((fifoFD = open(nameFifo.str(), O_RDONLY)) == -1)
+    {
+        printf("[%u]<%s:%d> Error open: %s\n", numChld, __func__, __LINE__, strerror(errno));
+        exit(1);
+    }
+    
+    fd_close_conn = pfd;
+    nChld = numChld;
+    servSock = sockServer;
+    
     RequestManager *ReqMan = new(nothrow) RequestManager(numChld);
     if (!ReqMan)
     {
@@ -260,8 +280,6 @@ void manager(int sockServer, int numChld)
         exit(1);
     }
     
-    nChld = numChld;
-    servSock = sockServer;
     RM = ReqMan;
 
     if (signal(SIGINT, signal_handler) == SIG_ERR)
@@ -296,6 +314,12 @@ void manager(int sockServer, int numChld)
     {
         print_err("[%d] <%s:%d> Error create thread(get_request): errno=%d \n", numChld, __func__, __LINE__, errno);
         exit(errno);
+    }
+    //------------------------------------------------------------------
+    if (chdir(conf->rootDir.str()))
+    {
+        print_err("[%d] <%s:%d> Error chdir(%s): %s\n", numChld, __func__, __LINE__, conf->rootDir.str(), strerror(errno));
+        exit(1);
     }
     //------------------------------------------------------------------
     int n = 0;
@@ -334,23 +358,43 @@ void manager(int sockServer, int numChld)
 
     while (1)
     {
+        int clientSocket;
         socklen_t addrSize;
         struct sockaddr_storage clientAddr;
        
         check_num_conn();
 
-        addrSize = sizeof(struct sockaddr_storage);
-        int clientSocket = accept(sockServer, (struct sockaddr *)&clientAddr, &addrSize);
-        if (clientSocket == -1)
+        char ch;
+        int ret = read(fifoFD, &ch, 1);
+        if ((ret != 1) || (ch != nChld))
         {
-            print_err("[%d] <%s:%d>  Error accept(): %s\n", numChld, __func__, __LINE__, strerror(errno));
-            if ((errno == EINTR) || (errno == EMFILE) || (errno == EAGAIN))
-                continue;
-            else
-                break;
+            print_err("<%s:%d> ret = %d\n", __func__, __LINE__, ret);
+            break;
+        }
+
+        while (1)
+        {
+            addrSize = sizeof(struct sockaddr_storage);
+            clientSocket = accept(sockServer, (struct sockaddr *)&clientAddr, &addrSize);
+            if (clientSocket == -1)
+            {
+                print_err("[%d] <%s:%d>  Error accept(): %s\n", numChld, __func__, __LINE__, strerror(errno));
+                if ((errno == EINTR) || (errno == EMFILE) || (errno == EAGAIN))
+                    continue;
+            }
+            break;
         }
         
-        num_c++;
+        if (clientSocket == -1)
+            break;
+        ++allConn;
+
+        char chwr = numChld | 0x80;
+        if (write(pfd, &chwr, 1) < 1)
+        {
+            print_err("[%d] <%s:%d>  Error write(): %s\n", numChld, __func__, __LINE__, strerror(errno));
+            break;
+        }
 
         Connect *req;
         req = create_req();
@@ -360,7 +404,7 @@ void manager(int sockServer, int numChld)
             close(clientSocket);
             continue;
         }
-
+/*
         int flags = fcntl(clientSocket, F_GETFL);
         if (flags == -1)
             print_err("<%s:%d> Error fcntl(, F_GETFL, ): %s\n", __func__, __LINE__, strerror(errno));
@@ -369,10 +413,10 @@ void manager(int sockServer, int numChld)
             if (fcntl(clientSocket, F_SETFL, flags | O_NONBLOCK) == -1)
                 print_err("<%s:%d> Error fcntl(, F_SETFL, ): %s\n", __func__, __LINE__, strerror(errno));
         }
-/*
+*/
         int opt = 1;
         ioctl(clientSocket, FIONBIO, &opt);
-*/
+
         if (sys_sndbufsize == 0)
         {
             socklen_t optlen = sizeof(sys_sndbufsize);
@@ -386,9 +430,8 @@ void manager(int sockServer, int numChld)
                 print_err("[%u] <%s:%d> Error getsockopt(SO_SNDBUF): %s\n", numChld, __func__, __LINE__, strerror(errno));
         }
 
-        req->err = 0;
         req->numChld = numChld;
-        req->numConn = ++allConn;
+        req->numConn = allConn;
         req->numReq = 0;
         req->clientSocket = clientSocket;
         req->timeout = conf->TimeOut;
@@ -401,9 +444,9 @@ void manager(int sockServer, int numChld)
                     NI_NUMERICHOST | NI_NUMERICSERV);
 
         start_conn();
-        push_req_list(req);
+        push_req_list(req);// --- First request ---
     }
-
+    
     ReqMan->close_manager();
     thrReqMan.join();
 
@@ -423,15 +466,19 @@ void manager(int sockServer, int numChld)
         ReqMan->push_req(req);
         --n;
     }
+
+    close(fifoFD);
+    close(pfd);
     
     close_send_list();
     SendFile.join();
-    
+
     close_request();
     thrRequest.join();
 
- //   print_err("[%d] <%s:%d> *** Exit  ***\n", numChld, __func__, __LINE__);
     delete ReqMan;
+    sleep(1);
+    print_err("[%d] <%s:%d> ***** Exit *****\n", numChld, __func__, __LINE__);
 }
 //======================================================================
 Connect *create_req(void)

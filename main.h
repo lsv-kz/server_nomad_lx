@@ -79,6 +79,7 @@ struct Config
     String servPort = "20000";
     
     char tcp_cork = 'n';
+    char TcpNoDelay = 'y';
 
     int NumChld = 1;
     int MaxThreads = 15;
