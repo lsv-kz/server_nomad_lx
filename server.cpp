@@ -59,6 +59,8 @@ int main(int argc, char *argv[])
     if (sockServer == -1)
     {
         cerr << "<" << __LINE__ << ">   server: failed to bind\n";
+        free_fcgi_list();
+        close_logs();
         cin.get();
         exit(1);
     }

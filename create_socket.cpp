@@ -33,7 +33,7 @@ int create_server_socket(const Config *conf)
         }
     }
     
-    ioctl(sockfd, FIONBIO, &sock_opt);
+//    ioctl(sockfd, FIONBIO, &sock_opt);
 //----------------------------------------------------------------------
     optlen = sizeof(sndbuf);
     if (getsockopt(sockfd, SOL_SOCKET, SO_SNDBUF, (void *)&sndbuf, &optlen))
