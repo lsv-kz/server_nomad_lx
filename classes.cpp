@@ -45,7 +45,10 @@
 
         n = empty_line();
         if (n == 1)
+        {
+            timeout = conf->TimeOut;
             return i_bufReq;
+        }
         else if (n < 0)
             return n;
         

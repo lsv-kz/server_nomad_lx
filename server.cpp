@@ -124,8 +124,8 @@ int main(int argc, char *argv[])
     //------------------------------------------------------------------
     Connect::serverSocket = sockServer;
     
-    int Start[2];
-    if (pipe(Start) < 0)
+    int from_chld[2];
+    if (pipe(from_chld) < 0)
     {
         printf("<%s():%d> Error pipe(): %s\n", __FUNCTION__, __LINE__, strerror(errno));
         exit(1);
@@ -147,7 +147,7 @@ int main(int argc, char *argv[])
             exit(1);
         }
         
-        pid_child = create_child(numChld, Start, fifoFD);
+        pid_child = create_child(numChld, from_chld, fifoFD);
         if (pid_child < 0)
         {
             print_err("<%s:%d> Error create_child() %d \n", __func__, __LINE__, numChld);
@@ -163,7 +163,7 @@ remove(s);
         ++numChld;
     }
     
-    close(Start[1]);
+    close(from_chld[1]);
 
     if (signal(SIGINT, signal_handler) == SIG_ERR)
     {
@@ -190,13 +190,13 @@ remove(s);
     
     struct pollfd fdrd[2];
     
-    fdrd[0].fd = Start[0];
+    fdrd[0].fd = from_chld[0];
     fdrd[0].events = POLLIN;
     
     fdrd[1].fd = sockServer;
     fdrd[1].events = POLLIN;
     
-    int numFD = 2, waitRD = 0;
+    int numFD = 2, ack = 1;
     int close_server = 0;
     while (!close_server)
     {
@@ -209,76 +209,85 @@ remove(s);
             break;
         }
 
-        if ((fdrd[1].revents & (POLLERR | POLLHUP | POLLNVAL)) && (!waitRD))
+        if (fdrd[1].revents && (numFD == 2))
         {
-            print_err("<%s:%d> Error fdrd[1].revents=0x%x\n", __func__, __LINE__, fdrd[1].revents);
-            break;
+            if (fdrd[1].revents == POLLIN)
+            {
+                char ch = conf->NumChld;
+
+                for (int i = 0; i < conf->NumChld; ++i)
+                {
+                    if (nConn[i] < (conf->MAX_REQUESTS))
+                    {
+                        ch = i;
+                        break;
+                    }
+                }
+
+                if (ch < conf->NumChld)
+                {
+                    ret = write(fifoFD[(int)ch], &ch, 1);
+                    if (ret < 0)
+                    {
+                        print_err("<%s:%d> Error write()=-1: %s\n", __func__, __LINE__, strerror(errno));
+                        close_server = 1;
+                        break;
+                    }
+                    ack = 0;
+                }
+                numFD = 1;
+            }
+            else
+            {
+                print_err("<%s:%d> Error fdrd[1].revents=0x%x\n", __func__, __LINE__, fdrd[1].revents);
+                break;
+            }
         }
 
-        if ((fdrd[1].revents == POLLIN) && (!waitRD))
+        if (fdrd[0].revents)
         {
-            char ch = conf->NumChld;
-
-            for (int i = 0; i < conf->NumChld; ++i)
+            if (fdrd[0].revents == POLLIN)
             {
-                if (nConn[i] < (conf->MAX_REQUESTS))
+                unsigned char ch[32];
+                ret = read(from_chld[0], ch, 32);
+                if (ret <= 0)
                 {
-                    ch = i;
-                    break;
-                }
-            }
-
-            if (ch < conf->NumChld)
-            {
-                ret = write(fifoFD[(int)ch], &ch, 1);
-                if (ret < 0)
-                {
-                    print_err("<%s:%d> Error write()=-1: %s\n", __func__, __LINE__, strerror(errno));
+                    print_err("<%s:%d> Error read()=%d: %s\n", __func__, __LINE__, ret, strerror(errno));
                     close_server = 1;
                     break;
                 }
-                waitRD = 1;
-            }
-            numFD = 1;
-        }
 
-        if (fdrd[0].revents == POLLIN)
-        {
-            char ch[32];
-            ret = read(Start[0], ch, 32);
-            if (ret < 0)
+                for (int i = 0; i < ret; ++i)
+                {
+                    if (ch[i] & 0x80)
+                    {
+                        ch[i] = ch[i] & 0x7f;
+                        (*(nConn + ch[i]))++;
+                        ack = 1;
+                    }
+                    else if (ch[i] < conf->NumChld)
+                    {
+                        (*(nConn + ch[i]))--;
+                    }
+                }
+                
+                if (ack)
+                    numFD = 2;
+            }
+            else
             {
-                print_err("<%s:%d> Error read()=-1: %s\n", __func__, __LINE__, strerror(errno));
-                close_server = 1;
+                print_err("<%s:%d> Error fdrd[0].revents=0x%x\n", __func__, __LINE__, fdrd[0].revents);
                 break;
-            }
-
-            for (int i = 0; i < ret; ++i)
-            {
-                if (ch[i] & 0x80)
-                {
-                    waitRD = 0;
-                    ch[i] = ch[i] & 0x7f;
-                    (*(nConn + ch[i]))++;
-                    numFD = 3;
-                }
-                else
-                {
-                    (*(nConn + ch[i]))--;
-                    if (waitRD == 0)
-                        numFD = 2;
-                }
             }
         }
     }
 
-    for (numChld = 0; numChld < conf->NumChld; ++numChld)
+    for (int i = 0; i < conf->NumChld; ++i)
     {
-        close(fifoFD[numChld]);
+        close(fifoFD[i]);
     }
 
     close(sockServer);
-    
     delete [] nConn;
 
     while ((pid = wait(NULL)) != -1)
@@ -296,7 +305,7 @@ remove(s);
 //======================================================================
 void manager(int sock, int num, int);
 //======================================================================
-pid_t create_child(int num_chld, int *pfd1, int *fifoFd)
+pid_t create_child(int num_chld, int *from_chld, int *fifoFd)
 {
     pid_t pid;
 
@@ -330,11 +339,11 @@ pid_t create_child(int num_chld, int *pfd1, int *fifoFd)
             close(fifoFd[i]);
         }
         
-        close(pfd1[0]);
-        manager(sockServer, num_chld, pfd1[1]);
-        close(pfd1[1]);
-        close_logs();
+        close(from_chld[0]);
+        manager(sockServer, num_chld, from_chld[1]);
+        close(from_chld[1]);
         
+        close_logs();
         exit(0);
     }
     else if (pid < 0)

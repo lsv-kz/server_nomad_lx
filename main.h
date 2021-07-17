@@ -277,7 +277,6 @@ long fcgi_to_cosmos(int fd_in, unsigned int size, int timeout);
 
 int script_to_file(int fd_in, int fd_out, int cont_len, int timeout);
 
-int fcgi_read_padding(int fd, unsigned char len, int timeout);
 int fcgi_read_stderr(int fd, int cont_len, int timeout);
 
 int send_largefile(Connect *req, char *buf, int size, off_t offset, long long *cont_len);
@@ -320,8 +319,8 @@ void send_files(int);
 void push_send_list(Connect *res);
 void close_send_list(void);
 //----------------------------------------------------------------------
+void req_handler(RequestManager *ReqMan);
 void push_req_list(Connect *req);
-void close_request(void);
-void get_request(RequestManager *ReqMan);
+void close_req_list(void);
 
 #endif

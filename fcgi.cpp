@@ -2,7 +2,7 @@
 #include "fcgi.h"
 
 using namespace std;
-
+void hex_dump_stderr(const char *s, int line, const void *p, int n);
 //======================================================================
 int get_sock_fcgi(Connect *req, const char *script)
 {
@@ -56,7 +56,7 @@ int fcgi_read_headers(char *s, int len, String *hdrs, int *stat)
         char *end_ptr;
         if (i <= 0)
         {
-            printf("<%s:%d> i = %d\n", __func__, __LINE__, i);
+            print_err("<%s:%d> i = %d\n", __func__, __LINE__, i);
             return -1;
         }
         end_ptr = (char*)memchr(start_ptr, '\n', i);
@@ -191,8 +191,11 @@ int fcgi_(Connect *req, int fcgi_sock, FCGI_client & Fcgi)
                 if (chunk_mode)
                 {
                     if (req->resp.respStatus >= RS400)
+                    {
                         send_message(req, NULL, NULL);
-                    else if (send_response_headers(req, &hdrs))
+                        return 0;
+                    }
+                    else if (send_response_headers(req, &hdrs) == -1)
                         return -1;
         
                     if (req->resp.respStatus == RS204)
@@ -200,11 +203,15 @@ int fcgi_(Connect *req, int fcgi_sock, FCGI_client & Fcgi)
                         return 0;
                     }
                 }
-                    
+
                 chunk.add_arr(p + tail, n - tail);
             }
             else
+            {
+                req->resp.respStatus = RS502;
+                send_message(req, NULL, NULL);
                 return -1;
+            }
             empty_line = 1;
         }
         else
@@ -212,7 +219,7 @@ int fcgi_(Connect *req, int fcgi_sock, FCGI_client & Fcgi)
     }
     
     int ret = chunk.end();
-    req->resp.respContentLength = chunk.all();
+    req->resp.respContentLength = chunk.len_entity();
     if (ret < 0)
     {
         print_err(req, "<%s:%d> Error chunk.end(): %d\n", __func__, __LINE__, ret);
@@ -221,7 +228,6 @@ int fcgi_(Connect *req, int fcgi_sock, FCGI_client & Fcgi)
     
     if (chunk_mode == NO_SEND)
     {
-//print_err("<%s:%d> chunk.all() = %d\n", __func__, __LINE__, chunk.all());
         if (send_response_headers(req, &hdrs))
         {
             print_err("<%s:%d> Error send_header_response()\n", __func__, __LINE__);

@@ -100,7 +100,7 @@ unique_lock<mutex> lk(mtx_thr);
 int RequestManager::wait_create_thr(int *n)
 {
 unique_lock<mutex> lk(mtx_thr);
-    while (((num_wait_thr >= 1) || (count_thr >= conf->MaxThreads)) && !stop_manager)
+    while (((num_wait_thr >= 1) || (count_thr >= conf->MaxThreads) || !count_conn) && !stop_manager)
     {
         cond_new_thr.wait(lk);
     }
@@ -308,11 +308,11 @@ void manager(int sockServer, int numChld, int pfd)
     thread thrRequest;
     try
     {
-        thrRequest = thread(get_request, ReqMan);
+        thrRequest = thread(req_handler, ReqMan);
     }
     catch (...)
     {
-        print_err("[%d] <%s:%d> Error create thread(get_request): errno=%d \n", numChld, __func__, __LINE__, errno);
+        print_err("[%d] <%s:%d> Error create thread(req_handler): errno=%d \n", numChld, __func__, __LINE__, errno);
         exit(errno);
     }
     //------------------------------------------------------------------
@@ -473,7 +473,7 @@ void manager(int sockServer, int numChld, int pfd)
     close_send_list();
     SendFile.join();
 
-    close_request();
+    close_req_list();
     thrRequest.join();
 
     delete ReqMan;

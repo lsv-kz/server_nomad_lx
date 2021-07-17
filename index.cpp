@@ -214,7 +214,7 @@ int index_chunked(Connect *req, char **list, int numFiles, String& path)
     }
     //------------------------------------------------------------------
     n = chunk_buf.end();
-    req->resp.respContentLength = chunk_buf.all();
+    req->resp.respContentLength = chunk_buf.len_entity();
     if (n < 0)
     {
         print_err(req, "<%s:%d>   Error chunk_buf.end(): %d\n", __func__, __LINE__, n);
@@ -223,7 +223,6 @@ int index_chunked(Connect *req, char **list, int numFiles, String& path)
     
     if (chunk == NO_SEND)
     {
-//print_err("<%s:%d> chunk.all() = %d\n", __func__, __LINE__, chunk.all());
         if (send_response_headers(req, &hdrs))
         {
             print_err("<%s:%d> Error send_header_response()\n", __func__, __LINE__);

@@ -145,7 +145,7 @@ void send_files(int num_chld)
 {
     int count_resp = 0;
     int ret = 0;
-    int timeout = 100;
+    int timeout = 10;
     int size_buf = conf->WR_BUFSIZE;
     char *rd_buf = NULL;
     

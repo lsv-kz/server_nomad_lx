@@ -755,3 +755,27 @@ const char *str_err(int i)
     }
     return "";
 }
+//======================================================================
+void hex_dump_stderr(const char *s, int line, const void *p, int n)
+{
+    int count, addr = 0, col;
+    unsigned char *buf = (unsigned char*)p;
+    char str[18];
+    cerr << "<" << s << ":" << line << ">--- HEX ---\n";
+    for(count = 0; count < n;)
+    {
+        cerr << uppercase << fixed << right << setw(8) << setfill('0') << hex << addr << "  "; 
+        for(col = 0, addr = addr + 0x10; (count < n) && (col < 16); count++, col++)
+        {
+            if (col == 8) cerr << ' ';
+            cerr << uppercase << fixed << right << setw(2) << setfill('0') << hex << (int)*(buf+count) << " "; 
+            str[col] = (*(buf + count) >= 32 && *(buf + count) < 127) ? *(buf + count) : '.';
+        }
+
+        str[col] = 0;
+        if (col <= 8) cerr << ' ';
+        cerr << "  " << setfill(' ') << setw(((16 - (col))) * 3) << ""  << str << "\n"; 
+    }
+    
+    cerr << dec << "----------------------------------------------\n";
+}

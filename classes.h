@@ -80,11 +80,12 @@ public:
 //======================================================================
 const int CHUNK_SIZE_BUF = 4096;
 const int MAX_LEN_SIZE_CHUNK = 6;
+ // NO_SEND - {Request="HEAD"}; SEND_NO_CHUNK - {"Connection: close", HTTP/0.9, HTTP/1.0}; SEND_CHUNK - {all other}
 enum mode_chunk {NO_SEND = 0, SEND_NO_CHUNK, SEND_CHUNK};
 //----------------------------------------------------------------------
 class ClChunked
 {
-    int i, mode, allSend;
+    int i, mode, allSend, lenEntity;
     int err = 0;
     Connect *req;
     char buf[CHUNK_SIZE_BUF + MAX_LEN_SIZE_CHUNK + 10];
@@ -123,7 +124,7 @@ class ClChunked
         return ret;
     }
 public://---------------------------------------------------------------
-    ClChunked(Connect *rq, int m){req = rq; mode = m; i = allSend = err = 0;}
+    ClChunked(Connect *rq, int m){req = rq; mode = m; i = allSend = err = lenEntity = 0;}
     //------------------------------------------------------------------
     ClChunked & operator << (const long long ll)
     {
@@ -131,31 +132,6 @@ public://---------------------------------------------------------------
         String ss(32);
         ss << ll;
         *this << ss;
-/*
-        int n = 0, len = ss.len();
-        if (mode == NO_SEND)
-        {
-            allSend += len;
-            return *this;
-        }
-        
-        while (CHUNK_SIZE_BUF < (i + len))
-        {
-            int l = CHUNK_SIZE_BUF - i;
-            memcpy(buf + MAX_LEN_SIZE_CHUNK + i, ss.str() + n, l);
-            i += l;
-            len -= l;
-            n += l;
-            int ret = send_chunk(i);
-            if (ret < 0)
-            {
-                err = 1;
-                return *this;
-            }
-        }
-
-        memcpy(buf + MAX_LEN_SIZE_CHUNK + i, ss.str() + n, len);
-        i += len;*/
         return *this;
     }
     //------------------------------------------------------------------
@@ -173,6 +149,8 @@ public://---------------------------------------------------------------
             allSend += len;
             return *this;
         }
+        
+        lenEntity += len;
         
         while (CHUNK_SIZE_BUF < (i + len))
         {
@@ -198,63 +176,8 @@ public://---------------------------------------------------------------
     {
         if (err) return *this;
         *this << s.str();
-    /*
-        int n = 0, len = s.len();
-        if (len == 0) return *this;
-        if (mode == NO_SEND)
-        {
-            allSend += len;
-            return *this;
-        }
-        
-        while (CHUNK_SIZE_BUF < (i + len))
-        {
-            int l = CHUNK_SIZE_BUF - i;
-            memcpy(buf + MAX_LEN_SIZE_CHUNK + i, s.str() + n, l);
-            i += l;
-            len -= l;
-            n += l;
-            int ret = send_chunk(i);
-            if (ret < 0)
-            {
-                err = 1;
-                return *this;
-            }
-        }
-        memcpy(buf + MAX_LEN_SIZE_CHUNK + i, s.str() + n, len);
-        i += len;*/
         return *this;
     }
-    //------------------------------------------------------------------
-/*    ClChunked & operator << (const std::string& s)
-    {
-        if (err) return *this;
-        int n = 0, len = s.size();
-        if (len == 0) return *this;
-        if (mode == NO_SEND)
-        {
-            allSend += len;
-            return *this;
-        }
-        
-        while (CHUNK_SIZE_BUF < (i + len))
-        {
-            int l = CHUNK_SIZE_BUF - i;
-            memcpy(buf + MAX_LEN_SIZE_CHUNK + i, s.c_str() + n, l);
-            i += l;
-            len -= l;
-            n += l;
-            int ret = send_chunk(i);
-            if (ret < 0)
-            {
-                err = 1;
-                return *this;
-            }
-        }
-        memcpy(buf + MAX_LEN_SIZE_CHUNK + i, s.c_str() + n, len);
-        i += len;
-        return *this;
-    }*/
     //------------------------------------------------------------------
     int add_arr(const char *s, int len)
     {
@@ -265,6 +188,8 @@ public://---------------------------------------------------------------
             allSend += len;
             return 0;
         }
+        
+        lenEntity += len;
         
         int n = 0;
         while (CHUNK_SIZE_BUF < (i + len))
@@ -384,6 +309,7 @@ public://---------------------------------------------------------------
     //------------------------------------------------------------------
     int all(){return allSend;}
     int error() { return err; }
+    int len_entity() { return lenEntity; }
 };
 
 #endif
