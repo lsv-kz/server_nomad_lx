@@ -77,30 +77,22 @@ struct Config
     String host = "0.0.0.0";
     String ServerSoftware = "x";
     String servPort = "20000";
-    
     char tcp_cork = 'n';
     char TcpNoDelay = 'y';
-
     int NumChld = 1;
     int MaxThreads = 15;
     int MinThreads = 6;
     int MaxRequestsPerThr = 50;
-
     int MaxChldsCgi = 5;
-
     int ListenBacklog = 128;
-
     int WR_BUFSIZE = 16284;
-    
+    int TIMEOUT_POLL = 10;
     char SEND_FILE = 'n';
-    
     int MAX_REQUESTS = 256;
-
     char KeepAlive = 'y';
     int TimeoutKeepAlive = 5;
     int TimeOut = 30;
     int TimeoutCGI = 5;
-    int TimeoutThreadCond = 5;
 
     String rootDir = "";
     String cgiDir = "";
@@ -146,6 +138,7 @@ public:
     int       err;
     time_t    sock_timer;
     int       timeout;
+    int       event;
     
     char      remoteAddr[NI_MAXHOST];
     char      remotePort[NI_MAXSERV];
@@ -241,8 +234,8 @@ public:
     int get_all_thr(void);
     int start_thr(void);
     void wait_exit_thr(int n);
-    void push_req(Connect *req);
-    Connect *pop_req();
+    friend void push_resp_list(Connect *req, RequestManager *);
+    Connect *pop_resp_list();
     int end_thr(int);
     int wait_create_thr(int*);
     void close_manager();
@@ -315,12 +308,9 @@ void cgi_dec();
 void end_response(Connect *req);
 
 //----------------------------------------------------------------------
-void send_files(int);
-void push_send_list(Connect *res);
-void close_send_list(void);
-//----------------------------------------------------------------------
-void req_handler(RequestManager *ReqMan);
-void push_req_list(Connect *req);
-void close_req_list(void);
+void event_handler(RequestManager *ReqMan);
+void push_pollin_list(Connect *req);
+void push_pollout_list(Connect *req);
+void close_event_handler();
 
 #endif

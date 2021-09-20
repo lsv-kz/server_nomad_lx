@@ -11,7 +11,7 @@ void response1(RequestManager *ReqMan)
 
     while(1)
     {
-        req = ReqMan->pop_req();
+        req = ReqMan->pop_resp_list();
         if (!req)
         {
             print_err("[%d] <%s:%d>  req = NULL\n", ReqMan->get_num_chld(), __func__, __LINE__);
@@ -453,7 +453,7 @@ int response2(Connect *req)
         return 0;
     }
 
-    push_send_list(req);
+    push_pollout_list(req);
 
     return 1;
 }

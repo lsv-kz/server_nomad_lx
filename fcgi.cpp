@@ -100,38 +100,29 @@ int fcgi_(Connect *req, int fcgi_sock, FCGI_client & Fcgi)
 //print_err("<%s:%d> -------------------------\n", __func__, __LINE__);
     if(req->reqMethod == M_POST)
     {
-        int len_fcgi_buf = Fcgi.size_stdin();
-        char *p = req->tail;
         if (req->tail)
         {
-            while (req->lenTail > 0)
+            int err = Fcgi.fcgi_stdin(req->tail, req->lenTail);
+            if (err)
             {
-                int wr = (req->lenTail > len_fcgi_buf) ? len_fcgi_buf : req->lenTail;
-                
-                int err = Fcgi.write_to_server(p, wr);
-                if (err)
-                {
-                    return -RS502;
-                }
-                
-                req->lenTail -= wr;
-                req->req_hdrs.reqContentLength -= wr;
-                p += wr;
+                return -RS502;
             }
+            
+            req->req_hdrs.reqContentLength -= req->lenTail;
         }
 
-        p = Fcgi.get_ptr();
         while (req->req_hdrs.reqContentLength > 0)
         {
-            int rd = (req->req_hdrs.reqContentLength > len_fcgi_buf) ? len_fcgi_buf : (int)req->req_hdrs.reqContentLength;
-            int ret = read_timeout(req->clientSocket, p, rd, conf->TimeOut);
+            char buf[4096];
+            int rd = (req->req_hdrs.reqContentLength > (long long)sizeof(buf)) ? sizeof(buf) : (int)req->req_hdrs.reqContentLength;
+            int ret = read_timeout(req->clientSocket, buf, rd, conf->TimeOut);
             if (ret < 0)
             {
                 print_err(req, "<%s:%d> Error: reaf_from_client()\n", __func__, __LINE__);
                 return ret;
             }
             
-            int err = Fcgi.write_to_server(p, ret);
+            int err = Fcgi.fcgi_stdin(buf, ret);
             if (err)
             {
                 return -RS502;
@@ -142,7 +133,7 @@ int fcgi_(Connect *req, int fcgi_sock, FCGI_client & Fcgi)
     }
 
     // End FCGI_STDIN
-    if (Fcgi.write_to_server(NULL, 0))
+    if (Fcgi.fcgi_stdin(NULL, 0))
     {
         print_err(req, "<%s:%d> Error: End FCGI_STDIN\n", __func__, __LINE__);
         return -RS502;
@@ -173,7 +164,7 @@ int fcgi_(Connect *req, int fcgi_sock, FCGI_client & Fcgi)
     
     while (1)
     {
-        int n = Fcgi.read_from_server(&p);
+        int n = Fcgi.fcgi_stdout(&p);// read_from_server
         if (n < 0)
         {
             printf("<%s:%d> Error Fcgi.read_from_server()\n", __func__, __LINE__);
@@ -203,7 +194,7 @@ int fcgi_(Connect *req, int fcgi_sock, FCGI_client & Fcgi)
                         return 0;
                     }
                 }
-
+//print_err(req, "<%s:%d> n=%d, tail=%d\n", __func__, __LINE__, n, tail);
                 chunk.add_arr(p + tail, n - tail);
             }
             else
@@ -219,6 +210,7 @@ int fcgi_(Connect *req, int fcgi_sock, FCGI_client & Fcgi)
     }
     
     int ret = chunk.end();
+//print_err("<%s:%d> chunk.all() = %d\n", __func__, __LINE__, chunk.all());
     req->resp.respContentLength = chunk.len_entity();
     if (ret < 0)
     {
@@ -228,6 +220,7 @@ int fcgi_(Connect *req, int fcgi_sock, FCGI_client & Fcgi)
     
     if (chunk_mode == NO_SEND)
     {
+//print_err("<%s:%d> chunk.all() = %d\n", __func__, __LINE__, chunk.all());
         if (send_response_headers(req, &hdrs))
         {
             print_err("<%s:%d> Error send_header_response()\n", __func__, __LINE__);
@@ -284,6 +277,7 @@ int fcgi_send_param(Connect *req, int fcgi_sock)
         if(req->req_hdrs.iReqContentType >= 0)
         {
             Fcgi.add("CONTENT_TYPE", req->req_hdrs.Value[req->req_hdrs.iReqContentType]);
+            print_err(req, "<%s:%d> %s\n", __func__, __LINE__, req->req_hdrs.Value[req->req_hdrs.iReqContentType]);
         }
         
         if(req->req_hdrs.iReqContentLength >= 0)

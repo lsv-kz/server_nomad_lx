@@ -23,7 +23,7 @@
 #define FCGI_UNKNOWN_TYPE       11
 #define FCGI_MAXTYPE            (FCGI_UNKNOWN_TYPE)
 #define requestId               1
- 
+
 const int FCGI_SIZE_BUF = 4096;
 //======================================================================
 typedef struct {
@@ -38,7 +38,7 @@ class FCGI_client
     char fcgi_buf[FCGI_SIZE_BUF];
     const char *str_zero = "\0\0\0\0\0\0\0\0";
     int offset_out = 0, all_send = 0;
-    char *ptr_buf;
+    const int SIZE_HEADER = 8;
     int fcgi_sock;
     int TimeoutCGI = 10;
     fcgi_header header = {0, 0, 0};
@@ -50,10 +50,10 @@ class FCGI_client
             return;
         fcgi_set_header(fcgi_buf, FCGI_PARAMS, offset_out);
 
-        if (end)
+        if (end) // && ((offset_out + 16) <= FCGI_SIZE_BUF))
         {
-            char s[8] = {1, 4, 0, 1, 0, 0, 0, 0};
-            memcpy(ptr_buf + offset_out, s, 8);
+            char s[8] = {1, 4, 0, 1, 0, 0, 0, 0};// ptr_buf
+            memcpy(fcgi_buf + SIZE_HEADER + offset_out, s, 8);
             offset_out += 8;
             end = 0;
         }
@@ -110,7 +110,7 @@ class FCGI_client
                     continue;
                 break;
             }
-            
+
             write_bytes += ret;
             len -= ret;
             p += ret;
@@ -196,7 +196,7 @@ class FCGI_client
         
         if (padding)
         {
-            memcpy(ptr_buf + offset_out, str_zero, padding);
+            memcpy(fcgi_buf + SIZE_HEADER + offset_out, str_zero, padding);
             offset_out += padding;
         }
     }
@@ -205,7 +205,7 @@ class FCGI_client
     {
         if (err)
             return;
-        
+        char *ptr_buf = fcgi_buf + SIZE_HEADER;
         offset_out = 0;
         ptr_buf[offset_out++] = (unsigned char) ((FCGI_RESPONDER >> 8) & 0xff);
         ptr_buf[offset_out++] = (unsigned char) (FCGI_RESPONDER        & 0xff);
@@ -243,7 +243,6 @@ class FCGI_client
 public://===============================================================
     FCGI_client(int sock, int timeout)
     {
-        ptr_buf = fcgi_buf + 8;
         fcgi_sock = sock;
         TimeoutCGI = timeout;
         offset_out = 0;
@@ -253,12 +252,9 @@ public://===============================================================
     //------------------------------------------------------------------
     int error() const { return err; }
     int send_bytes() { return all_send; }
-    int size_stdin() { return FCGI_SIZE_BUF - 16; }
-    char *get_ptr() { return ptr_buf; }
-    
     void add(const char *name, const char *val);
-    int read_from_server(char **p);
-    int write_to_server(char *p, int len);
+    int fcgi_stdout(char **p);
+    int fcgi_stdin(const char *p, int len);
 };
 //======================================================================
     void FCGI_client::add(const char *name, const char *val)
@@ -297,7 +293,7 @@ public://===============================================================
             }
         }
         
-        char *p = ptr_buf + offset_out;
+        char *p = fcgi_buf + SIZE_HEADER + offset_out;
         if (len_name < 0x80)
             *p++ = (unsigned char)len_name;
         else
@@ -324,8 +320,8 @@ public://===============================================================
         
         offset_out += len;
     }
-//======================================================================
-    int FCGI_client::read_from_server(char **p) // *** FCGI_STDOUT ***
+    //==================================================================
+    int FCGI_client::fcgi_stdout(char **p) // *** FCGI_STDOUT ***  
     {
         char padd[256];
         *p = fcgi_buf;
@@ -371,6 +367,7 @@ public://===============================================================
                 int n = fcgi_read(padd, header.len);
                 if (n > 0)
                 {
+                    fprintf(stderr, "\n");
                     header.len -= n;
                 }
                 
@@ -385,7 +382,7 @@ public://===============================================================
                 if (n > 0)
                 {
                     padd[n] = 0;
-                    fprintf(stderr, "%s\n", padd);//*** FCGI_STDERR ***
+                    fprintf(stderr, "%s\n", padd);
                     header.len -= n;
                 }
                 else
@@ -401,22 +398,37 @@ public://===============================================================
             }
         }
     }
-//======================================================================
-    int FCGI_client::write_to_server(char *p, int len)// *** FCGI_STDIN ***
+    //==================================================================
+    int FCGI_client::fcgi_stdin(const char *p, int len)// *** FCGI_STDIN ***
     {
         if (err)
-            return -1;
+            return err;
         
-        if (len > (FCGI_SIZE_BUF - 16))
-            return (err = 1);
-        if (p)
+        if (!p)
         {
-            memcpy(ptr_buf, p, len);
-            offset_out += len;
+            fcgi_set_header(fcgi_buf, FCGI_STDIN, 0);
+            fcgi_send();
+            return err;
+        }
+
+        int wr;
+        while ((len > 0) && (err == 0))
+        {
+            if (len > (FCGI_SIZE_BUF - 16))
+                wr = FCGI_SIZE_BUF - 16;
+            else
+                wr = len;
+
+            memcpy(fcgi_buf + SIZE_HEADER, p, wr);
+            offset_out += wr;
+            
+            fcgi_set_header(fcgi_buf, FCGI_STDIN, wr);
+            fcgi_send();
+
+            p += wr;
+            len -= wr;
         }
         
-        fcgi_set_header(fcgi_buf, FCGI_STDIN, len);
-        fcgi_send();
         return err;
     }
 

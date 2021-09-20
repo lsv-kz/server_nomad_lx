@@ -63,7 +63,8 @@ int create_conf_file(const char *path)
     fconf << "WrBufSize   " << c.WR_BUFSIZE << "\n";
     fconf << "MaxRequests " << c.MAX_REQUESTS << "\n\n";
     
-    fconf << "SendFile  " << c.SEND_FILE << "\n\n";
+    fconf << "SendFile  " << c.SEND_FILE << "\n";
+    fconf << "TimeoutPoll  " << c.TIMEOUT_POLL << "\n\n";
     
     fconf << "NumChld " << c.NumChld << "\n";
     fconf << "MaxThreads " << c.MaxThreads << "\n";
@@ -74,7 +75,6 @@ int create_conf_file(const char *path)
     fconf << "KeepAlive  " << c.KeepAlive << " #   y/n" << "\n";
     fconf << "TimeoutKeepAlive " << c.TimeoutKeepAlive << "\n";
     fconf << "TimeOut    " << c.TimeOut << "\n";
-    fconf << "TimeoutThreadCond   " << c.TimeoutThreadCond << "\n";
     fconf << "TimeoutCGI " << c.TimeoutCGI << "\n\n";
 
     fconf << "ClientMaxBodySize " << c.ClientMaxBodySize << "\n\n";
@@ -184,6 +184,8 @@ void read_conf_file(const char *path_conf)
             ss >> c.ListenBacklog;
         else if (s == "SendFile")
             ss >> c.SEND_FILE;
+        else if (s == "TimeoutPoll")
+            ss >> c.TIMEOUT_POLL;
         else if (s == "WrBufSize")
             ss >> c.WR_BUFSIZE;
         else if (s == "MaxRequests")
@@ -204,8 +206,6 @@ void read_conf_file(const char *path_conf)
             ss >> c.TimeOut;
         else if (s == "TimeoutCGI")
             ss >> c.TimeoutCGI;
-        else if (s == "TimeoutThreadCond")
-            ss >> c.TimeoutThreadCond;
         else if (s == "UsePHP")
             ss >> c.UsePHP;
         else if (s == "PathPHP")

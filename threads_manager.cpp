@@ -2,9 +2,8 @@
 
 using namespace std;
 
-mutex mtx_conn;
-condition_variable cond_close_conn;
-
+static mutex mtx_conn;
+static condition_variable cond_close_conn;
 static int count_conn = 0;
 //======================================================================
 RequestManager::RequestManager(int n)
@@ -20,23 +19,23 @@ RequestManager::~RequestManager()
     free_fcgi_list();
 }
 //----------------------------------------------------------------------
-int RequestManager::get_num_chld(void)
+int RequestManager::get_num_chld()
 {
     return numChld;
 }
 //----------------------------------------------------------------------
-int RequestManager::get_num_thr(void)
+int RequestManager::get_num_thr()
 {
 lock_guard<std::mutex> lg(mtx_thr);
     return count_thr;
 }
 //----------------------------------------------------------------------
-int RequestManager::get_all_thr(void)
+int RequestManager::get_all_thr()
 {
     return all_thr;
 }
 //----------------------------------------------------------------------
-int RequestManager::start_thr(void)
+int RequestManager::start_thr()
 {
 mtx_thr.lock();
     int ret = ++count_thr;
@@ -54,31 +53,33 @@ void RequestManager::wait_exit_thr(int n)
     }
 }
 //----------------------------------------------------------------------
-void RequestManager::push_req(Connect *req)
+void push_resp_list(Connect *req, RequestManager *ReqMan)
 {
-mtx_thr.lock();
+ReqMan->mtx_thr.lock();
     req->next = NULL;
-    req->prev = list_end;
-    if (list_start)
+    req->prev = ReqMan->list_end;
+    if (ReqMan->list_start)
     {
-        list_end->next = req;
-        list_end = req;
+        ReqMan->list_end->next = req;
+        ReqMan->list_end = req;
     }
     else
-        list_start = list_end = req;
+        ReqMan->list_start = ReqMan->list_end = req;
 
-    ++size_list;
-mtx_thr.unlock();
-    cond_list.notify_one();
+    ++ReqMan->size_list;
+ReqMan->mtx_thr.unlock();
+    ReqMan->cond_list.notify_one();
 }
 //----------------------------------------------------------------------
-Connect *RequestManager::pop_req()
+Connect *RequestManager::pop_resp_list()
 {
 unique_lock<mutex> lk(mtx_thr);
     ++num_wait_thr;
     while (list_start == NULL)
     {
         cond_list.wait(lk);
+        if (stop_manager)
+            return NULL;
     }
     --num_wait_thr;
     Connect *req = list_start;
@@ -133,6 +134,7 @@ void RequestManager::close_manager()
     stop_manager = 1;
     cond_new_thr.notify_one();
     cond_exit_thr.notify_one();
+    cond_list.notify_all();
 }
 //======================================================================
 int get_num_conn(void)
@@ -158,7 +160,6 @@ unique_lock<mutex> lk(mtx_conn);
     return 0;
 }
 //======================================================================
-static int fd_close_conn;
 static int nChld;
 //----------------------------------------------------------------------
 void end_response(Connect *req)
@@ -169,18 +170,10 @@ void end_response(Connect *req)
             print_log(req);
         shutdown(req->clientSocket, SHUT_RDWR);
         close(req->clientSocket);
-        
         delete req;
     mtx_conn.lock();
         --count_conn;
     mtx_conn.unlock();
-        char ch = nChld;
-        if (write(fd_close_conn, &ch, 1) <= 0)
-        {
-            print_err("<%s:%d> Error write(): %s\n", __func__, __LINE__, strerror(errno));
-            exit(1);
-        }
-        
         cond_close_conn.notify_all();
     }
     else
@@ -194,7 +187,7 @@ void end_response(Connect *req)
         print_log(req);
         req->timeout = conf->TimeoutKeepAlive;
         ++req->numReq;
-        push_req_list(req);
+        push_pollin_list(req);
     }
 }
 //======================================================================
@@ -225,9 +218,9 @@ void thr_create_manager(int numProc, RequestManager *ReqMan)
 //    print_err("[%d] <%s:%d> *** Exit thread_req_manager() ***\n", numProc, __func__, __LINE__);
 }
 //======================================================================
-int servSock;
-RequestManager *RM;
-unsigned long allConn = 0;
+static int servSock;
+static RequestManager *RM;
+static unsigned long allConn = 0;
 //======================================================================
 void RequestManager::print_intr()
 {
@@ -253,25 +246,11 @@ static void signal_handler(int sig)
     }
 }
 //======================================================================
-Connect *create_req(void);
-static int sys_sndbufsize = 0;
+Connect *create_req();
 void set_sndbuf(int n); 
 //======================================================================
-void manager(int sockServer, int numChld, int pfd)
+void manager(int sockServer, int numChld)
 {
-    String nameFifo;
-    nameFifo << "./fifo_" << numChld;
-    int fifoFD;
-    if ((fifoFD = open(nameFifo.str(), O_RDONLY)) == -1)
-    {
-        printf("[%u]<%s:%d> Error open: %s\n", numChld, __func__, __LINE__, strerror(errno));
-        exit(1);
-    }
-    
-    fd_close_conn = pfd;
-    nChld = numChld;
-    servSock = sockServer;
-    
     RequestManager *ReqMan = new(nothrow) RequestManager(numChld);
     if (!ReqMan)
     {
@@ -280,6 +259,8 @@ void manager(int sockServer, int numChld, int pfd)
         exit(1);
     }
     
+    nChld = numChld;
+    servSock = sockServer;
     RM = ReqMan;
 
     if (signal(SIGINT, signal_handler) == SIG_ERR)
@@ -294,32 +275,15 @@ void manager(int sockServer, int numChld, int pfd)
         exit(EXIT_FAILURE);
     }
     //----------------------------------------
-    thread SendFile;
+    thread EventHandler;
     try
     {
-        SendFile = thread(send_files, numChld);
+        EventHandler = thread(event_handler, ReqMan);
     }
     catch (...)
     {
         print_err("[%d] <%s:%d> Error create thread(send_file_): errno=%d \n", numChld, __func__, __LINE__, errno);
         exit(errno);
-    }
-    //------------------------------------------------------------------
-    thread thrRequest;
-    try
-    {
-        thrRequest = thread(req_handler, ReqMan);
-    }
-    catch (...)
-    {
-        print_err("[%d] <%s:%d> Error create thread(req_handler): errno=%d \n", numChld, __func__, __LINE__, errno);
-        exit(errno);
-    }
-    //------------------------------------------------------------------
-    if (chdir(conf->rootDir.str()))
-    {
-        print_err("[%d] <%s:%d> Error chdir(%s): %s\n", numChld, __func__, __LINE__, conf->rootDir.str(), strerror(errno));
-        exit(1);
     }
     //------------------------------------------------------------------
     int n = 0;
@@ -358,42 +322,20 @@ void manager(int sockServer, int numChld, int pfd)
 
     while (1)
     {
-        int clientSocket;
         socklen_t addrSize;
         struct sockaddr_storage clientAddr;
        
         check_num_conn();
 
-        char ch;
-        int ret = read(fifoFD, &ch, 1);
-        if ((ret != 1) || (ch != nChld))
-        {
-            print_err("<%s:%d> ret = %d\n", __func__, __LINE__, ret);
-            break;
-        }
-
-        while (1)
-        {
-            addrSize = sizeof(struct sockaddr_storage);
-            clientSocket = accept(sockServer, (struct sockaddr *)&clientAddr, &addrSize);
-            if (clientSocket == -1)
-            {
-                print_err("[%d] <%s:%d>  Error accept(): %s\n", numChld, __func__, __LINE__, strerror(errno));
-                if ((errno == EINTR) || (errno == EMFILE) || (errno == EAGAIN))
-                    continue;
-            }
-            break;
-        }
-        
+        addrSize = sizeof(struct sockaddr_storage);
+        int clientSocket = accept(sockServer, (struct sockaddr *)&clientAddr, &addrSize);
         if (clientSocket == -1)
-            break;
-        ++allConn;
-
-        char chwr = numChld | 0x80;
-        if (write(pfd, &chwr, 1) < 1)
         {
-            print_err("[%d] <%s:%d>  Error write(): %s\n", numChld, __func__, __LINE__, strerror(errno));
-            break;
+            print_err("[%d] <%s:%d>  Error accept(): %s\n", numChld, __func__, __LINE__, strerror(errno));
+            if ((errno == EINTR) || (errno == EMFILE) || (errno == EAGAIN))
+                continue;
+            else
+                break;
         }
 
         Connect *req;
@@ -417,21 +359,8 @@ void manager(int sockServer, int numChld, int pfd)
         int opt = 1;
         ioctl(clientSocket, FIONBIO, &opt);
 
-        if (sys_sndbufsize == 0)
-        {
-            socklen_t optlen = sizeof(sys_sndbufsize);
-            if (getsockopt(clientSocket, SOL_SOCKET, SO_SNDBUF, (void *)&sys_sndbufsize, &optlen) == 0)
-            {
-                printf("[%u] <%s:%d> system_bufsize=%d\n", numChld, __func__, __LINE__, sys_sndbufsize);
-                if ((sys_sndbufsize/2) < conf->WR_BUFSIZE)
-                    set_sndbuf(sys_sndbufsize/2);
-            }
-            else
-                print_err("[%u] <%s:%d> Error getsockopt(SO_SNDBUF): %s\n", numChld, __func__, __LINE__, strerror(errno));
-        }
-
         req->numChld = numChld;
-        req->numConn = allConn;
+        req->numConn = ++allConn;
         req->numReq = 0;
         req->clientSocket = clientSocket;
         req->timeout = conf->TimeOut;
@@ -444,37 +373,18 @@ void manager(int sockServer, int numChld, int pfd)
                     NI_NUMERICHOST | NI_NUMERICSERV);
 
         start_conn();
-        push_req_list(req);// --- First request ---
+        push_pollin_list(req);// --- First request ---
     }
     
-    ReqMan->close_manager();
-    thrReqMan.join();
-
     n = ReqMan->get_num_thr();
     print_err("[%d] <%s:%d>  numThr=%d; allNumThr=%u; allConn=%u; open_conn=%d\n", numChld, 
                     __func__, __LINE__, n, ReqMan->get_all_thr(), allConn, get_num_conn());
-
-    while (n)
-    {
-        Connect *req;
-        req = create_req();
-        if (!req)
-        {
-            break;
-        }
-        req->clientSocket = -1;
-        ReqMan->push_req(req);
-        --n;
-    }
-
-    close(fifoFD);
-    close(pfd);
     
-    close_send_list();
-    SendFile.join();
-
-    close_req_list();
-    thrRequest.join();
+    ReqMan->close_manager();
+    thrReqMan.join();
+    
+    close_event_handler();
+    EventHandler.join();
 
     delete ReqMan;
     sleep(1);

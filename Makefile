@@ -11,9 +11,8 @@ OBJS = $(OBJSDIR)/server.o \
 	$(OBJSDIR)/send_headers.o \
 	$(OBJSDIR)/config.o \
 	$(OBJSDIR)/threads_manager.o \
-	$(OBJSDIR)/request.o \
 	$(OBJSDIR)/response.o \
-	$(OBJSDIR)/send_files.o \
+	$(OBJSDIR)/event_handler.o \
 	$(OBJSDIR)/create_socket.o \
 	$(OBJSDIR)/percent_coding.o \
 	$(OBJSDIR)/rd_wr.o \
@@ -41,14 +40,11 @@ $(OBJSDIR)/config.o: config.cpp main.h String.h
 $(OBJSDIR)/threads_manager.o: threads_manager.cpp main.h
 	$(CC) $(CFLAGS) -c threads_manager.cpp -o $@
 
-$(OBJSDIR)/request.o: request.cpp main.h
-	$(CC) $(CFLAGS) -c request.cpp -o $@
-
 $(OBJSDIR)/response.o: response.cpp main.h classes.h String.h
 	$(CC) $(CFLAGS) -c response.cpp -o $@
 
-$(OBJSDIR)/send_files.o: send_files.cpp main.h
-	$(CC) $(CFLAGS) -c send_files.cpp -o $@
+$(OBJSDIR)/event_handler.o: event_handler.cpp main.h
+	$(CC) $(CFLAGS) -c event_handler.cpp -o $@
 
 $(OBJSDIR)/create_socket.o: create_socket.cpp main.h
 	$(CC) $(CFLAGS) -c create_socket.cpp -o $@
