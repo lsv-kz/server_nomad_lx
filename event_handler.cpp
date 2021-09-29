@@ -207,7 +207,6 @@ void event_handler(RequestManager *ReqMan)
         }
         else if (ret == 0)
         {
-            //print_err("[%d]<%s:%d> count_resp=%d\n", num_chld, __func__, __LINE__, count_resp);
             continue;
         }
         
@@ -239,7 +238,7 @@ void event_handler(RequestManager *ReqMan)
                 else if (wr == -EAGAIN)
                 {
                     r->sock_timer = 0;
-                    print_err(r, "<%s:%d> Error: EAGAIN\n", __func__, __LINE__);
+                    //print_err(r, "<%s:%d> Error: EAGAIN\n", __func__, __LINE__);
                 }
             }
             else if (fdwr[i].revents == POLLIN)

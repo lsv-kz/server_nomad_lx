@@ -246,8 +246,7 @@ static void signal_handler(int sig)
     }
 }
 //======================================================================
-Connect *create_req();
-void set_sndbuf(int n); 
+Connect *create_req(); 
 //======================================================================
 void manager(int sockServer, int numChld)
 {

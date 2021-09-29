@@ -1,10 +1,10 @@
 #include "main.h"
-#include <sstream>
 
 using namespace std;
 
 static Config c;
 const Config* const conf = &c;
+const int minOpenFD = 6;
 //======================================================================
 int check_path(String & path)
 {
@@ -301,12 +301,6 @@ void read_conf_file(const char *path_conf)
     }
     
     fconf.close();
-/*
-    fcgi_list_addr *i = c.fcgi_list;
-    for (; i; i = i->next)
-    {
-        cerr << "[" << i->scrpt_name.str() << "] = [" << i->addr.str() << "]\n";
-    }*/
 //-------------------------log_dir--------------------------------------
     if (check_path(c.logDir) == -1)
     {
@@ -340,7 +334,7 @@ void read_conf_file(const char *path_conf)
     else
     {
         printf("<%s:%d> lim.rlim_max=%lu, lim.rlim_cur=%lu\n", __func__, __LINE__, (unsigned long)lim.rlim_max, (unsigned long)lim.rlim_cur);
-        long max_fd = (c.MAX_REQUESTS * 2) + 9;
+        long max_fd = (c.MAX_REQUESTS * 2) + minOpenFD;
         if (max_fd > (long)lim.rlim_cur)
         {
             if (max_fd > (long)lim.rlim_max)
@@ -354,7 +348,7 @@ void read_conf_file(const char *path_conf)
             if (max_fd > 1)
             {
                 print_err("<%s:%d> _SC_OPEN_MAX=%d\n", __func__, __LINE__, max_fd);
-                c.MAX_REQUESTS = (max_fd - 9)/2;
+                c.MAX_REQUESTS = (max_fd - minOpenFD)/2;
                 printf("<%s:%d> MaxRequests=%d, _SC_OPEN_MAX=%ld\n", __func__, __LINE__, c.MAX_REQUESTS, max_fd);
             }
             else
@@ -474,9 +468,4 @@ void free_fcgi_list()
         if (prev) delete prev;
     }
 }
-//======================================================================
-void set_sndbuf(int n)
-{
-    if (c.WR_BUFSIZE > n)
-        c.WR_BUFSIZE = n;
-}
+
