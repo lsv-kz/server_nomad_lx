@@ -83,10 +83,8 @@ void print_err(const char *format, ...)
     va_start(ap, format);
     vsnprintf(buf, MAX_PATH * 2, format, ap);
     va_end(ap);
-    
     String ss(256);
     ss << "[" << get_time() << "] - " << buf;
-    
 mtxLog.lock();
     write(flog_err, ss.str(), ss.len());
 mtxLog.unlock();

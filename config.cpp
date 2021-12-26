@@ -16,7 +16,7 @@ int check_path(String & path)
         fprintf(stderr, "<%s:%d> Error stat(): %s\n", __func__, __LINE__, strerror(errno));
         return -1;
     }
-
+    
     if (!S_ISDIR(st.st_mode))
     {
         fprintf(stderr, "<%s:%d> [%s] is not directory\n", __func__, __LINE__, path.str());
@@ -45,17 +45,16 @@ int create_conf_file(const char *path)
         cin.get();
         exit(1);
     }
-
+    
+    fconf << "ServerSoftware   " << "x" << "\n";
     fconf << "ServerAddr   " << "0.0.0.0" << "\n";
     fconf << "Port         ?\n";
-    fconf << "ServerSoftware   " << "x" << "\n";
-    
     fconf << "tcp_cork   " << c.tcp_cork << "\n";
     fconf << "TcpNoDelay   y\n\n";
     fconf << "DocumentRoot " << c.rootDir.str() << "\n";
     fconf << "ScriptPath   " << c.cgiDir.str() << "\n";
     fconf << "LogPath      " << c.logDir.str() << "\n\n";
-
+    
     fconf << "MaxRequestsPerThr " << c.MaxRequestsPerThr << "\n\n";
     
     fconf << "ListenBacklog " << c.ListenBacklog << "\n\n";
@@ -82,7 +81,7 @@ int create_conf_file(const char *path)
     fconf << " UsePHP     n  # php-fpm # php-cgi \n";
     fconf << "# PathPHP   /usr/bin/php-cgi\n";
     fconf << "# PathPHP  127.0.0.1:9000  #  /run/php/php7.0-fpm.sock \n\n";
-
+    
     fconf << "index {\n"
                 "\t#index.html\n"
                 "}\n\n";
@@ -299,7 +298,7 @@ void read_conf_file(const char *path_conf)
             }
         }
     }
-    
+
     fconf.close();
 //-------------------------log_dir--------------------------------------
     if (check_path(c.logDir) == -1)
@@ -322,10 +321,10 @@ void read_conf_file(const char *path_conf)
         c.cgiDir = "";
         cerr << "!!! Error ScriptPath [" << c.cgiDir.str() << "]\n";
     }
-    
+
     if (c.MinThreads < 1)
         c.MinThreads = 1;
-    
+
     struct rlimit lim;
     if (getrlimit(RLIMIT_NOFILE, &lim) == -1)
     {
@@ -341,13 +340,13 @@ void read_conf_file(const char *path_conf)
                 lim.rlim_cur = lim.rlim_max;
             else
                 lim.rlim_cur = max_fd;
-            
+
             if (setrlimit(RLIMIT_NOFILE, &lim) == -1)
                 print_err("<%s:%d> Error setrlimit(RLIMIT_NOFILE): %s\n", __func__, __LINE__, strerror(errno));
             max_fd = (long)sysconf(_SC_OPEN_MAX);
             if (max_fd > 1)
             {
-                print_err("<%s:%d> _SC_OPEN_MAX=%d\n", __func__, __LINE__, max_fd);
+                print_err("<%s:%d> _SC_OPEN_MAX=%d\n", __func__, __LINE__, (int)max_fd);
                 c.MAX_REQUESTS = (max_fd - minOpenFD)/2;
                 printf("<%s:%d> MaxRequests=%d, _SC_OPEN_MAX=%ld\n", __func__, __LINE__, c.MAX_REQUESTS, max_fd);
             }

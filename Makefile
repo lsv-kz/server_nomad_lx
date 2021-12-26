@@ -55,7 +55,7 @@ $(OBJSDIR)/percent_coding.o: percent_coding.cpp main.h
 $(OBJSDIR)/rd_wr.o: rd_wr.cpp main.h
 	$(CC) $(CFLAGS) -c rd_wr.cpp -o $@
 
-$(OBJSDIR)/functions.o: functions.cpp main.h
+$(OBJSDIR)/functions.o: functions.cpp main.h String.h
 	$(CC) $(CFLAGS) -c functions.cpp -o $@
 
 $(OBJSDIR)/log.o: log.cpp main.h String.h

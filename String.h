@@ -1,24 +1,20 @@
 #ifndef CLASS_STRING_H_
 #define CLASS_STRING_H_
 
+#include <iostream>
 #include <cstring>
-#include <string>
+//#include <string>
 //======================================================================
-class BaseString
-{
-public:
-    int b;
-    BaseString(int n) { b = n; }
-};
-//======================================================================
-#define Hex BaseString(16)
-#define Dec BaseString(10)
+class BaseHex {};
+class BaseDec {};
+
+#define Hex BaseHex()
+#define Dec BaseDec()
 //======================================================================
 class String
 {
 protected:
-    const int ADDITION = 128;
-    int add = ADDITION;
+    const int add = 32;
     unsigned int lenBuf = 0;
     unsigned int sizeBuf = 0;
     int err = 0;
@@ -27,17 +23,13 @@ protected:
     
     char *ptr = NULL;
     
-    void append(const String & s)
+    void append(const String& s)
     {
-        if (err) return;
-        if (s.lenBuf == 0) return;
+        if (err || (s.lenBuf == 0)) return;
         if ((lenBuf + s.lenBuf) >= sizeBuf)
         {
-            if (lenBuf)
-                reserve(lenBuf + s.lenBuf + 1 + add);
-            else
-                reserve(s.lenBuf + 1);
-            if (err) return;
+            if (reserve(lenBuf + s.lenBuf + add))
+                return;
         }
         memcpy(ptr + lenBuf, s.ptr, s.lenBuf);
         lenBuf += s.lenBuf;
@@ -49,11 +41,8 @@ protected:
         unsigned long len = 1;
         if ((lenBuf + len) >= sizeBuf)
         {
-            if (lenBuf)
-                reserve(lenBuf + len + 1 + add);
-            else
-                reserve(len + 1);
-            if (err) return;
+            if (reserve(lenBuf + len + add))
+                return;
         }
         memcpy(ptr + lenBuf, &ch, len);
         lenBuf += len;
@@ -67,16 +56,13 @@ protected:
         if (len == 0) return;
         if ((lenBuf + len) >= sizeBuf)
         {
-            if (lenBuf)
-                reserve(lenBuf + len + 1 + add);
-            else
-                reserve(len + 1);
-            if (err) return;
+            if (reserve(lenBuf + len + add))
+                return;
         }
         memcpy(ptr + lenBuf, s, len);
         lenBuf += len;
     }
-    
+    /*
     void append(const std::string & s)
     {
         if (err) return;
@@ -85,24 +71,21 @@ protected:
         if (len == 0) return;
         if ((lenBuf + len) >= sizeBuf)
         {
-            if (lenBuf)
-                reserve(lenBuf + len + 1 + add);
-            else
-                reserve(len + 1);
-            if (err) return;
+            if (reserve(lenBuf + len + add))
+                return;
         }
         memcpy(ptr + lenBuf, s.c_str(), len);
         lenBuf += len;
     }
-    
+    */
     void append(const char *src, unsigned int n, unsigned int len_src)
     {
         if (err) return;
         if (n > len_src) n = len_src;
         if ((lenBuf + n) >= sizeBuf)
         {
-            reserve(lenBuf + n + 1 + add);
-            if (err) return;
+            if (reserve(lenBuf + n + add))
+                return;
         }
         
         memcpy(ptr + lenBuf, src, n);
@@ -120,6 +103,42 @@ protected:
         err = p_ = 0;
         base_ = 10;
     }
+    //------------------------------------------------------------------
+    int get_delimiter()
+    {
+        if ((ptr == NULL) || (lenBuf == 0))
+            return -1;
+
+        for ( ; p_ < lenBuf; ++p_)
+        {
+            switch (ptr[p_])
+            {
+                case ' ':
+                case '\t':
+                case '\r':
+                case '\n':
+                    continue;
+            }
+            break;
+        }
+        
+        unsigned int i = p_;
+        for ( ; i < lenBuf; ++i)
+        {
+            switch (ptr[i])
+            {
+                case ' ':
+                case '\t':
+                case '\r':
+                case '\n':
+                    break;
+                default:
+                    continue;
+            }
+            break;
+        }
+        return i;
+    }
 
 public:
     String() {}
@@ -127,6 +146,18 @@ public:
     String(const char *s) { append(s); }
     String(char *s) { append(s); }
     String(const String& b) { append(b); }
+    
+    String& operator << (BaseHex b)
+    {
+        base_ = 16;
+        return *this;
+    }
+    
+    String& operator << (BaseDec b)
+    {
+        base_ = 10;
+        return *this;
+    }
     
     String(String&& b)
     {
@@ -141,22 +172,20 @@ public:
     
     ~String() { destroy(); }
     //------------------------------------------------------------------
-    void reserve(unsigned int n)
+    int reserve(unsigned int n)
     {
-        if (err) return;
+        if (err) return err;
         if (n <= sizeBuf)
         {
             if (n == 0)
                 destroy();
-            return;
+            return 0;
         }
         
         char *newBuf = new(std::nothrow) char [n];
         if (!newBuf)
-        {
-            err = 1;
-            return;
-        }
+            return (err = 1);
+
         if (ptr)
         {
             memcpy(newBuf, ptr, lenBuf);
@@ -166,6 +195,7 @@ public:
         sizeBuf = n;
         ptr = newBuf;
         *(ptr + lenBuf) = 0;
+        return 0;
     }
 //----------------------- = ----------------------------
     String & operator = (const String& b)
@@ -194,7 +224,7 @@ public:
     String & operator << (const char ch) { if (err) return *this; append(ch); return *this; }
     String & operator << (const char *s) { if (err) return *this; append(s); return *this; }
     String & operator << (char *s) { if (err) return *this; append(s); return *this; }
-    String & operator << (const std::string& s) { if (err) return *this; append(s); return *this; }
+    //String & operator << (const std::string& s) { if (err) return *this; append(s); return *this; }
     
     String & operator << (double f)
     {
@@ -254,21 +284,14 @@ public:
         if (!s || err) return;
         if ((lenBuf + n) >= sizeBuf)
         {
-            reserve(lenBuf + n + 1 + add);
-            if (err) return;
+            if (reserve(lenBuf + n + add))
+                return;
         }
         
         memcpy(ptr + lenBuf, s, n);
         lenBuf += n;
     }
     //------------------------------------------------------------------
-    String  &operator << (BaseString b)
-    {
-        if (err) return *this;
-        base_ = b.b;
-        return *this;
-    }
-
     const char *str() const
     { 
         if (err || (!ptr)) return ""; 
@@ -291,127 +314,87 @@ public:
     int base() const { return base_; }
     int get_p() const { return p_; }
     //----------------------------- >> ---------------------------------
-    const char *get_delimiter()
-    {
-        if ((ptr == NULL) || (lenBuf == 0))
-        {
-            return NULL;
-        }
-        
-        for ( ; (ptr[p_] == ' ') || (ptr[p_] == '\t') || (ptr[p_] == '\r') || (ptr[p_] == '\n'); ++p_)
-        {
-            if (p_ >= lenBuf) break;
-        }
-        
-        char *p1 = (char*)memchr(ptr + p_, ' ', lenBuf - p_);
-        char *p2 = (char*)memchr(ptr + p_, '\t', lenBuf - p_);
-        char *p3 = (char*)memchr(ptr + p_, '\r', lenBuf - p_);
-        char *p4 = (char*)memchr(ptr + p_, '\n', lenBuf - p_);
-        
-        char *p5 = ptr + lenBuf;
-        
-        if (!p1) p1 = p5;
-        if (!p2) p2 = p5;
-        if (!p3) p3 = p5;
-        if (!p4) p4 = p5;
-        
-        if ((p1 < p2) && (p1 < p3) && (p1 < p4))
-            return p1;
-        else if ((p2 < p1) && (p2 < p3) && (p2 < p4))
-            return p2;
-        else if ((p3 < p1) && (p3 < p2) && (p3 < p4))
-            return p3;
-        else if ((p4 < p1) && (p4 < p2) && (p4 < p3))
-            return p4;
-        else
-            return p5;
-    }
-    
     String & operator >> (String & s)
     {
-        if (err || (this == &s)) return *this;
+        if (err || (this == &s))
+            return *this;
         s.clear();
-        const char *p = get_delimiter();
-        if (p)
+        int next = get_delimiter();
+        if (next > 0)
         {
-            s.append(ptr + p_, (p - (ptr + p_)), lenBuf);
-            p_ += (p - (ptr + p_));
+            s.append(ptr + p_, (next - p_), lenBuf);
+            p_ = next;
         }
         
         return *this;
     }
-    
+    /*
     String & operator >> (std::string & s)
     {
-        if (err) return *this;
+        if (err)
+            return *this;
         s.clear();
-        const char *p = get_delimiter();
-        if (p)
+        int next = get_delimiter();
+        if (next > 0)
         {
-            s.append(ptr + p_, (p - (ptr + p_)));
-            p_ += (p - (ptr + p_));
+            s.append(ptr + p_, (next - p_));
+            p_ = next;
         }
+        return *this;
+    }
+    */
+    String & operator >> (char& ch)
+    {
+        if (err)
+            return *this;
+        get_delimiter();
+        ch = *(ptr + p_);
+        if (p_ < lenBuf)
+            p_ += 1;
         return *this;
     }
     
-    String & operator >> (char& ch)
+    String & operator >> (double& d)
     {
-        if (err) return *this;
-        const char *p = get_delimiter();
-        if (p)
-        {
-            ch = *(ptr + p_);
-            if (p_ < lenBuf)
-                p_ += 1;
-        }
+        if (err || (p_ == lenBuf))
+            return *this;
+        if (get_delimiter() < 0)
+            return *this;
+        char *pp = ptr + p_;
+        d = strtod(str() + p_, &pp);
+        if ((ptr + p_) != pp)
+            p_ += (pp - (ptr + p_));
+        else
+            d = 0;
+
         return *this;
     }
+    
+    String & operator >> (char *ch) =  delete;
 
     template <typename T>
     String & operator >> (T &t)
     {
-        if (err || (p_ == lenBuf)) return *this;
-        const char *p = get_delimiter();
-        if (!p) return *this;
+        if (err || (p_ == lenBuf))
+            return *this;
+     
+        if (get_delimiter() < 0)
+            return *this;
         char *pp = ptr + p_;
         t = (T)strtoll(str() + p_, &pp, base_);
         if ((ptr + p_) != pp)
             p_ += (pp - (ptr + p_));
         else
-        {
-            err = 1;
             t = 0;
-        }
+
         return *this;
-    }
-    //------------------------------------------------------------------
-    int get_front(char *s, int size) 
-    {
-        if (err || (p_ == lenBuf))
-        {
-            *s = 0;
-            return 1;
-        }
-        
-        const char *p = get_delimiter();
-        if (p)
-        {
-            int len = p - (ptr + p_);
-            if (size > len)
-            {
-                memcpy(s, ptr + p_, len);
-                *(s + len) = 0;
-                p_ += (p - (ptr + p_));
-            }
-            else
-                err = 1;
-        }
-        return err;
     }
     //--------------------------- == -----------------------------------
     friend const bool operator == (const String & s1, const String & s2)
     {
-        if (s1.lenBuf != s2.lenBuf) return false;
+        if (s1.lenBuf != s2.lenBuf)
+            return false;
+        
         if (strncmp(s1.str(), s2.str(), s1.lenBuf))
             return false;
         else
@@ -421,7 +404,9 @@ public:
     friend bool operator == (const String & s1, const char *s2)
     {
         unsigned int len = strlen(s2);
-        if (s1.lenBuf != len) return false;
+        if (s1.lenBuf != len)
+            return false;
+        
         if (strncmp(s1.str(), s2, len))
             return false;
         else
@@ -431,7 +416,9 @@ public:
     friend bool operator == (const char *s1, const String & s2)
     {
         unsigned int len = strlen(s1);
-        if (s2.lenBuf != len) return false;
+        if (s2.lenBuf != len)
+            return false;
+        
         if (strncmp(s2.str(), s1, len))
             return false;
         else
@@ -441,14 +428,16 @@ public:
     friend bool operator != (const String & s1, const char *s2)
     {
         unsigned long len = strlen(s2);
-        if (s1.lenBuf != len) return true;
+        if (s1.lenBuf != len)
+            return true;
+        
         if (strncmp(s1.str(), s2, len))
             return true;
         else
             return false;
     }
     //------------------------------------------------------------------
-    const char operator[] (unsigned int n)
+    const char operator[] (unsigned int n) const
     {
         if (err || (n >= lenBuf)) return -1;
         return *(ptr + n);
