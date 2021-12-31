@@ -10,7 +10,7 @@ int check_path(String & path)
 {
     struct stat st;
     
-    int ret = stat(path.str(), &st);
+    int ret = stat(path.c_str(), &st);
     if (ret == -1)
     {
         fprintf(stderr, "<%s:%d> Error stat(): %s\n", __func__, __LINE__, strerror(errno));
@@ -19,12 +19,12 @@ int check_path(String & path)
     
     if (!S_ISDIR(st.st_mode))
     {
-        fprintf(stderr, "<%s:%d> [%s] is not directory\n", __func__, __LINE__, path.str());
+        fprintf(stderr, "<%s:%d> [%s] is not directory\n", __func__, __LINE__, path.c_str());
         return -1;
     }
     
     char path_[PATH_MAX] = "";
-    if (!realpath(path.str(), path_))
+    if (!realpath(path.c_str(), path_))
     {
         fprintf(stderr, "<%s:%d> Error realpath(): %s\n", __func__, __LINE__, strerror(errno));
         return -1;
@@ -51,9 +51,9 @@ int create_conf_file(const char *path)
     fconf << "Port         ?\n";
     fconf << "tcp_cork   " << c.tcp_cork << "\n";
     fconf << "TcpNoDelay   y\n\n";
-    fconf << "DocumentRoot " << c.rootDir.str() << "\n";
-    fconf << "ScriptPath   " << c.cgiDir.str() << "\n";
-    fconf << "LogPath      " << c.logDir.str() << "\n\n";
+    fconf << "DocumentRoot " << c.rootDir.c_str() << "\n";
+    fconf << "ScriptPath   " << c.cgiDir.c_str() << "\n";
+    fconf << "LogPath      " << c.logDir.c_str() << "\n\n";
     
     fconf << "MaxRequestsPerThr " << c.MaxRequestsPerThr << "\n\n";
     
@@ -137,18 +137,18 @@ void read_conf_file(const char *path_conf)
     nameFile << "/server.conf";
     fcgi_list_addr *end = NULL;
     
-    ifstream fconf(nameFile.str(), ios::binary);
+    ifstream fconf(nameFile.c_str(), ios::binary);
     if (!fconf.is_open())
     {
-        if (create_conf_file(nameFile.str()))
+        if (create_conf_file(nameFile.c_str()))
         {
-            cerr << __func__ << "(): Error create conf file (" << nameFile.str() << "): "
+            cerr << __func__ << "(): Error create conf file (" << nameFile.c_str() << "): "
                  << strerror(errno) << "\n";
             cin.get();
             exit(1);
         }
         
-        cout << " Correct config file: " << nameFile.str() << "\n";
+        cout << " Correct config file: " << nameFile.c_str() << "\n";
         cin.get();
         exit(1);
     }
@@ -271,7 +271,7 @@ void read_conf_file(const char *path_conf)
                 getLine(fconf, ss);
                 ss >> s;
 
-                if ((s[0] == '#') || (s.len() == 0) || (s[0] == '{'))
+                if ((s[0] == '#') || (s.size() == 0) || (s[0] == '{'))
                     continue;
                 else if (s[0] == '}')
                     break;
@@ -303,7 +303,7 @@ void read_conf_file(const char *path_conf)
 //-------------------------log_dir--------------------------------------
     if (check_path(c.logDir) == -1)
     {
-        cerr << "!!! Error LogPath [" << c.logDir.str() << "]\n";
+        cerr << "!!! Error LogPath [" << c.logDir.c_str() << "]\n";
         cin.get();
         exit(1);
     }
@@ -311,7 +311,7 @@ void read_conf_file(const char *path_conf)
 //-------------------------root_dir-------------------------------------
     if (check_path(c.rootDir) == -1)
     {
-        cerr << "!!! Error DocumentRoot [" << c.rootDir.str()  << "]\n";
+        cerr << "!!! Error DocumentRoot [" << c.rootDir.c_str()  << "]\n";
         cin.get();
         exit(1);
     }
@@ -319,7 +319,7 @@ void read_conf_file(const char *path_conf)
     if (check_path(c.cgiDir) == -1)
     {
         c.cgiDir = "";
-        cerr << "!!! Error ScriptPath [" << c.cgiDir.str() << "]\n";
+        cerr << "!!! Error ScriptPath [" << c.cgiDir.c_str() << "]\n";
     }
 
     if (c.MinThreads < 1)
@@ -363,14 +363,14 @@ void read_conf_file(const char *path_conf)
     if (uid == 0)
     {
         char *p;
-        c.server_uid = strtol(conf->user.str(), &p, 0);
-        if (conf->user.len() && *p != '\0')
+        c.server_uid = strtol(conf->user.c_str(), &p, 0);
+        if (conf->user.size() && *p != '\0')
         {
-            struct passwd *passwdbuf = getpwnam(conf->user.str());
+            struct passwd *passwdbuf = getpwnam(conf->user.c_str());
             if (!passwdbuf)
             {
-                cerr << "[" << __func__ << ":" << __LINE__ << "] Error getpwnam(): " << conf->user.str() << "\n";
-                cout << "[" << __func__ << ":" << __LINE__ << "] Error getpwnam(): " << conf->user.str() << "\n";
+                cerr << "[" << __func__ << ":" << __LINE__ << "] Error getpwnam(): " << conf->user.c_str() << "\n";
+                cout << "[" << __func__ << ":" << __LINE__ << "] Error getpwnam(): " << conf->user.c_str() << "\n";
                 cin.get();
                 exit(1);
             }
@@ -389,14 +389,14 @@ void read_conf_file(const char *path_conf)
             }
         }
         
-        c.server_gid = strtol(conf->group.str(), &p, 0);
-        if (conf->group.len() && *p != '\0')
+        c.server_gid = strtol(conf->group.c_str(), &p, 0);
+        if (conf->group.size() && *p != '\0')
         {
-            struct group *groupbuf = getgrnam(conf->group.str());
+            struct group *groupbuf = getgrnam(conf->group.c_str());
             if (!groupbuf)
             {
-                cerr << "[" << __func__ << ":" << __LINE__ << "] Error getgrnam(): " << conf->group.str() << "\n";
-                cout << "[" << __func__ << ":" << __LINE__ << "] Error getgrnam(): " << conf->group.str() << "\n";
+                cerr << "[" << __func__ << ":" << __LINE__ << "] Error getgrnam(): " << conf->group.c_str() << "\n";
+                cout << "[" << __func__ << ":" << __LINE__ << "] Error getgrnam(): " << conf->group.c_str() << "\n";
                 cin.get();
                 exit(1);
             }

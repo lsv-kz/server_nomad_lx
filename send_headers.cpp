@@ -57,7 +57,7 @@ int send_response_headers(Connect *req, String *hdrs)
 
     if (hdrs)
     {
-        resp << hdrs->str();
+        resp << hdrs->c_str();
     }
 
     if(req->resp.numPart  > 1)
@@ -73,7 +73,7 @@ int send_response_headers(Connect *req, String *hdrs)
         return -1;
     }
 
-    int n = write_to_client(req, resp.str(), resp.len(), conf->TimeOut);
+    int n = write_to_client(req, resp.c_str(), resp.size(), conf->TimeOut);
     if(n <= 0)
     {
         print_err("<%s:%d> Sent to client response error; (%d)\n", __func__, __LINE__, n);
@@ -107,7 +107,7 @@ void send_message(Connect *req, const char *msg, String *hdrs)
                 "</html>";
         
         req->resp.respContentType = "text/html";
-        req->resp.respContentLength = html.len();
+        req->resp.respContentLength = html.size();
     }
     else
     {
@@ -124,7 +124,7 @@ void send_message(Connect *req, const char *msg, String *hdrs)
 
     if(req->resp.respContentLength > 0)
     {
-        req->resp.send_bytes = write_to_client(req, html.str(), req->resp.respContentLength, conf->TimeOut);
+        req->resp.send_bytes = write_to_client(req, html.c_str(), req->resp.respContentLength, conf->TimeOut);
         if(req->resp.send_bytes <= 0)
         {
             print_err("<%s:%d> Error write_timeout()\n", __func__, __LINE__);

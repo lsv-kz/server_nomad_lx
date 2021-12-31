@@ -50,8 +50,7 @@ protected:
     
     void append(const char * s)
     {
-        if (err) return;
-        if (!s) return;
+        if (!s || err) return;
         unsigned long len = strlen(s);
         if (len == 0) return;
         if ((lenBuf + len) >= sizeBuf)
@@ -62,25 +61,10 @@ protected:
         memcpy(ptr + lenBuf, s, len);
         lenBuf += len;
     }
-    /*
-    void append(const std::string & s)
-    {
-        if (err) return;
-        if (s.size() == 0) return;
-        unsigned long len = s.size();
-        if (len == 0) return;
-        if ((lenBuf + len) >= sizeBuf)
-        {
-            if (reserve(lenBuf + len + add))
-                return;
-        }
-        memcpy(ptr + lenBuf, s.c_str(), len);
-        lenBuf += len;
-    }
-    */
+    
     void append(const char *src, unsigned int n, unsigned int len_src)
     {
-        if (err) return;
+        if (!src || err) return;
         if (n > len_src) n = len_src;
         if ((lenBuf + n) >= sizeBuf)
         {
@@ -142,10 +126,10 @@ protected:
 
 public:
     String() {}
-    explicit String(int n) { if (n == 0) return; reserve(n); }
-    String(const char *s) { append(s); }
-    String(char *s) { append(s); }
-    String(const String& b) { append(b); }
+    explicit String(int n) { if (n == 0) return; p_ = 0; reserve(n); }
+    String(const char *s) { p_ = 0; append(s); }
+    String(char *s) { p_ = 0; append(s); }
+    String(const String& b) { p_ = 0; append(b); }
     
     String& operator << (BaseHex b)
     {
@@ -224,13 +208,12 @@ public:
     String & operator << (const char ch) { if (err) return *this; append(ch); return *this; }
     String & operator << (const char *s) { if (err) return *this; append(s); return *this; }
     String & operator << (char *s) { if (err) return *this; append(s); return *this; }
-    //String & operator << (const std::string& s) { if (err) return *this; append(s); return *this; }
     
     String & operator << (double f)
     {
         char s[32];
         snprintf(s, sizeof(s), "%.02f", f);
-        *this << s;
+        append(s);
         return *this;
     }
     
@@ -265,6 +248,7 @@ public:
             }
             if (t == 0) break;
         }
+        
         if (base_ == 10)
         {
             if (cnt <= 0)
@@ -292,27 +276,18 @@ public:
         lenBuf += n;
     }
     //------------------------------------------------------------------
-    const char *str() const
+    const char *c_str() const
     { 
         if (err || (!ptr)) return ""; 
         *(ptr + lenBuf) = 0; 
         return ptr; 
     }
     
-    const char *get_tail() const
-    {
-        if (err || (!ptr)) return "";
-        *(ptr + lenBuf) = 0;
-        return ptr + p_;
-    }
-    
     void clear() { err = lenBuf = p_ = 0; }
     int error() const { return err; }
-    unsigned int len() const { if (err) return 0; return lenBuf; }
+    unsigned int size() const { if (err) return 0; return lenBuf; }
     unsigned int capacity() const { return sizeBuf; }
     void resize(unsigned int n) { if (err || (n > lenBuf)) return; lenBuf = n; }
-    int base() const { return base_; }
-    int get_p() const { return p_; }
     //----------------------------- >> ---------------------------------
     String & operator >> (String & s)
     {
@@ -328,21 +303,7 @@ public:
         
         return *this;
     }
-    /*
-    String & operator >> (std::string & s)
-    {
-        if (err)
-            return *this;
-        s.clear();
-        int next = get_delimiter();
-        if (next > 0)
-        {
-            s.append(ptr + p_, (next - p_));
-            p_ = next;
-        }
-        return *this;
-    }
-    */
+    
     String & operator >> (char& ch)
     {
         if (err)
@@ -361,7 +322,7 @@ public:
         if (get_delimiter() < 0)
             return *this;
         char *pp = ptr + p_;
-        d = strtod(str() + p_, &pp);
+        d = strtod(c_str() + p_, &pp);
         if ((ptr + p_) != pp)
             p_ += (pp - (ptr + p_));
         else
@@ -381,7 +342,7 @@ public:
         if (get_delimiter() < 0)
             return *this;
         char *pp = ptr + p_;
-        t = (T)strtoll(str() + p_, &pp, base_);
+        t = (T)strtoll(c_str() + p_, &pp, base_);
         if ((ptr + p_) != pp)
             p_ += (pp - (ptr + p_));
         else
@@ -395,7 +356,7 @@ public:
         if (s1.lenBuf != s2.lenBuf)
             return false;
         
-        if (strncmp(s1.str(), s2.str(), s1.lenBuf))
+        if (strncmp(s1.c_str(), s2.c_str(), s1.lenBuf))
             return false;
         else
             return true;
@@ -407,7 +368,7 @@ public:
         if (s1.lenBuf != len)
             return false;
         
-        if (strncmp(s1.str(), s2, len))
+        if (strncmp(s1.c_str(), s2, len))
             return false;
         else
             return true;
@@ -419,7 +380,7 @@ public:
         if (s2.lenBuf != len)
             return false;
         
-        if (strncmp(s2.str(), s1, len))
+        if (strncmp(s2.c_str(), s1, len))
             return false;
         else
             return true;
@@ -431,7 +392,7 @@ public:
         if (s1.lenBuf != len)
             return true;
         
-        if (strncmp(s1.str(), s2, len))
+        if (strncmp(s1.c_str(), s2, len))
             return true;
         else
             return false;

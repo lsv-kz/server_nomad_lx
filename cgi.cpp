@@ -326,9 +326,9 @@ int cgi_fork(Connect *req, int *serv_cgi, int *cgi_serv, String& path)
         if (req->resp.scriptType == php_cgi)
             setenv("REDIRECT_STATUS", "true", 1);
         setenv("PATH", "/bin:/usr/bin:/usr/local/bin", 1);
-        setenv("SERVER_SOFTWARE", conf->ServerSoftware.str(), 1);
+        setenv("SERVER_SOFTWARE", conf->ServerSoftware.c_str(), 1);
         setenv("GATEWAY_INTERFACE", "CGI/1.1", 1);
-        setenv("DOCUMENT_ROOT", conf->rootDir.str(), 1);
+        setenv("DOCUMENT_ROOT", conf->rootDir.c_str(), 1);
         setenv("REMOTE_ADDR", req->remoteAddr, 1);
 //      setenv("REMOTE_HOST", req->remote_addr, 1);
         setenv("REMOTE_PORT", req->remotePort, 1);
@@ -343,7 +343,7 @@ int cgi_fork(Connect *req, int *serv_cgi, int *cgi_serv, String& path)
             setenv("HTTP_USER_AGENT", req->req_hdrs.Value[req->req_hdrs.iUserAgent], 1);
 
         setenv("SCRIPT_NAME", req->resp.scriptName, 1);
-        setenv("SCRIPT_FILENAME", path.str(), 1);
+        setenv("SCRIPT_FILENAME", path.c_str(), 1);
 
         if (req->reqMethod == M_POST)
         {
@@ -357,12 +357,12 @@ int cgi_fork(Connect *req, int *serv_cgi, int *cgi_serv, String& path)
 
         if (req->resp.scriptType == cgi_ex)
         {
-            execl(path.str(), base_name(req->resp.scriptName), NULL);
+            execl(path.c_str(), base_name(req->resp.scriptName), NULL);
         }
         else if (req->resp.scriptType == php_cgi)
         {
             if (conf->UsePHP == "php-cgi")
-                execl(conf->PathPHP.str(), base_name(conf->PathPHP.str()), NULL);
+                execl(conf->PathPHP.c_str(), base_name(conf->PathPHP.c_str()), NULL);
         }
 
     err_child:
@@ -381,7 +381,7 @@ int cgi_fork(Connect *req, int *serv_cgi, int *cgi_serv, String& path)
                 "  <hr>\n"
                 "  %s\n"
                 " </body>\n"
-                "</html>", strerror(errno), errno, req->resp.sLogTime.str());
+                "</html>", strerror(errno), errno, req->resp.sLogTime.c_str());
         exit(EXIT_FAILURE);
     }
     else
@@ -491,9 +491,9 @@ int cgi(Connect *req)
             goto errExit1;
     }
 
-    if (stat(path.str(), &st) == -1)
+    if (stat(path.c_str(), &st) == -1)
     {
-        print_err(req, "<%s:%d> script (%s) not found\n", __func__, __LINE__, path.str());
+        print_err(req, "<%s:%d> script (%s) not found\n", __func__, __LINE__, path.c_str());
         ret = -RS404;
         goto errExit1;
     }

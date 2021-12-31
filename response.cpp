@@ -99,7 +99,7 @@ void response1(RequestManager *ReqMan)
 
         if (strstr(req->uri, ".php") && (conf->UsePHP != "php-cgi") && (conf->UsePHP != "php-fpm"))
         {
-            print_err(req, "<%s:%d> Error UsePHP=%s\n", __func__, __LINE__, conf->UsePHP.str());
+            print_err(req, "<%s:%d> Error UsePHP=%s\n", __func__, __LINE__, conf->UsePHP.c_str());
             req->err = -RS404;
             goto end;
         }
@@ -178,7 +178,7 @@ int fastcgi(Connect* req, const char* uri)
     {
         if (i->scrpt_name[0] == '~')
         {
-            if (!strcmp(p, i->scrpt_name.str() + 1))
+            if (!strcmp(p, i->scrpt_name.c_str() + 1))
                 break;
         }
         else
@@ -191,7 +191,7 @@ int fastcgi(Connect* req, const char* uri)
     if (!i)
         return -RS404;
     req->resp.scriptType = fast_cgi;
-    req->resp.scriptName = i->scrpt_name.str();
+    req->resp.scriptName = i->scrpt_name.c_str();
     int ret = fcgi(req);
     req->resp.scriptName = NULL;
     return ret;
@@ -258,10 +258,10 @@ int response2(Connect *req)
     path << '.';
     
     path << req->decodeUri;
-    if (path[path.len()-1] == '/')
-        path.resize(path.len() - 1);
+    if (path[path.size()-1] == '/')
+        path.resize(path.size() - 1);
 
-    if (lstat(path.str(), &st) == -1)
+    if (lstat(path.c_str(), &st) == -1)
     {
     //    print_err(req, "<%s:%d> Error lstat(\"%s\"): %s\n", __func__, __LINE__, req->decodeUri, strerror(errno));
         if (errno == EACCES)
@@ -301,13 +301,13 @@ int response2(Connect *req)
                 return -RS500;
             }
 
-            send_message(req, s.str(), &hdrs);
+            send_message(req, s.c_str(), &hdrs);
             return 0;
         }
         //--------------------------------------------------------------
-        int len = path.len();
+        int len = path.size();
         path << "/index.html";
-        if ((stat(path.str(), &st) != 0) || (conf->index_html != 'y'))
+        if ((stat(path.c_str(), &st) != 0) || (conf->index_html != 'y'))
         {
             errno = 0;
             path.resize(len);
@@ -316,11 +316,11 @@ int response2(Connect *req)
             if ((conf->UsePHP != "n") && (conf->index_php == 'y'))
             {
                 path << "/index.php";
-                if (!stat(path.str(), &st))
+                if (!stat(path.c_str(), &st))
                 {
                     String s = req->decodeUri;
                     s << "index.php";
-                    req->resp.scriptName = s.str();
+                    req->resp.scriptName = s.c_str();
                     
                     if (conf->UsePHP == "php-fpm")
                     {
@@ -365,9 +365,9 @@ int response2(Connect *req)
         }
     }
     //------------------------------------------------------------------
-    req->resp.fileSize = file_size(path.str());
+    req->resp.fileSize = file_size(path.c_str());
     req->resp.numPart = 0;
-    req->resp.respContentType = content_type(path.str());
+    req->resp.respContentType = content_type(path.c_str());
 
     ArrayRanges rg;
     if (req->req_hdrs.iRange >= 0)
@@ -409,7 +409,7 @@ int response2(Connect *req)
         req->resp.respContentLength = req->resp.fileSize;
     }
     //------------------------------------------------------------------
-    req->resp.fd = open(path.str(), O_RDONLY);
+    req->resp.fd = open(path.c_str(), O_RDONLY);
     if (req->resp.fd == -1)
     {
         if (errno == EACCES)
@@ -417,7 +417,7 @@ int response2(Connect *req)
         else
         {
             print_err(req, "<%s:%d> Error open(%s): %s\n", __func__, __LINE__, 
-                                    path.str(), strerror(errno));
+                                    path.c_str(), strerror(errno));
             return -RS500;
         }
     }

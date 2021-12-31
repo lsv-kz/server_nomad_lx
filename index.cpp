@@ -53,7 +53,7 @@ int cmp(const void *a, const void *b)
 //======================================================================
 int index_chunked(Connect *req, char **list, int numFiles, String& path)
 {
-    const int len_path = path.len();
+    const int len_path = path.size();
     int n, i;
     long long size;
     struct stat st;
@@ -124,7 +124,7 @@ int index_chunked(Connect *req, char **list, int numFiles, String& path)
     {
         char buf[1024];
         path << list[i];
-        n = lstat(path.str(), &st);
+        n = lstat(path.c_str(), &st);
         path.resize(len_path);
         if ((n == -1) || !S_ISDIR (st.st_mode))
             continue;
@@ -155,7 +155,7 @@ int index_chunked(Connect *req, char **list, int numFiles, String& path)
     {
         char buf[1024];
         path << list[i];
-        n = lstat(path.str(), &st);
+        n = lstat(path.c_str(), &st);
         path.resize(len_path);
         if ((n == -1) || !S_ISREG (st.st_mode))
             continue;
@@ -245,14 +245,14 @@ int index_dir(Connect *req, String& path)
 
     path << '/';
     
-    dir = opendir(path.str());
+    dir = opendir(path.c_str());
     if (dir == NULL)
     {
         if(errno == EACCES)
             return -RS403;
         else
         {
-            print_err(req, "<%s:%d>  Error opendir(\"%s\"): %s\n", __func__, __LINE__, path.str(), strerror(errno));
+            print_err(req, "<%s:%d>  Error opendir(\"%s\"): %s\n", __func__, __LINE__, path.c_str(), strerror(errno));
             return -RS500;
         }
     }

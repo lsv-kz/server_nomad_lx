@@ -24,16 +24,16 @@ int get_sock_fcgi(Connect *req, const char *script)
     
     for (; ps; ps = ps->next)
     {
-        if (!strcmp(script, ps->scrpt_name.str()))
+        if (!strcmp(script, ps->scrpt_name.c_str()))
             break;
     }
 
     if (ps != NULL)
     {
-        fcgi_sock = create_fcgi_socket(ps->addr.str());
+        fcgi_sock = create_fcgi_socket(ps->addr.c_str());
         if (fcgi_sock < 0)
         {
-            print_err(req, "<%s:%d> Error create_client_socket(%s): %s\n", __func__, __LINE__, ps->addr.str(), strerror(-fcgi_sock));
+            print_err(req, "<%s:%d> Error create_client_socket(%s): %s\n", __func__, __LINE__, ps->addr.c_str(), strerror(-fcgi_sock));
             fcgi_sock = -RS500;
         }
     }
@@ -240,9 +240,9 @@ int fcgi_send_param(Connect *req, int fcgi_sock)
     if (req->resp.scriptType == php_fpm)
         Fcgi.add("REDIRECT_STATUS", "true");
     Fcgi.add("PATH", "/bin:/usr/bin:/usr/local/bin");
-    Fcgi.add("SERVER_SOFTWARE", conf->ServerSoftware.str());
+    Fcgi.add("SERVER_SOFTWARE", conf->ServerSoftware.c_str());
     Fcgi.add("GATEWAY_INTERFACE", "CGI/1.1"); 
-    Fcgi.add("DOCUMENT_ROOT", conf->rootDir.str());
+    Fcgi.add("DOCUMENT_ROOT", conf->rootDir.c_str());
     Fcgi.add("REMOTE_ADDR", req->remoteAddr);
     Fcgi.add("REMOTE_PORT", req->remotePort);
     Fcgi.add("REQUEST_URI", req->uri);
@@ -269,7 +269,7 @@ int fcgi_send_param(Connect *req, int fcgi_sock)
     {
         String s = conf->rootDir;
         s << req->resp.scriptName;
-        Fcgi.add("SCRIPT_FILENAME", s.str());
+        Fcgi.add("SCRIPT_FILENAME", s.c_str());
     }
 
     if(req->reqMethod == M_POST)
@@ -340,7 +340,7 @@ int fcgi(Connect *req)
     
     if (req->resp.scriptType == php_fpm)
     {
-        sock_fcgi = create_fcgi_socket(conf->PathPHP.str());
+        sock_fcgi = create_fcgi_socket(conf->PathPHP.c_str());
     }
     else if (req->resp.scriptType == fast_cgi)
     {

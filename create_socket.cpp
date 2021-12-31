@@ -49,7 +49,7 @@ int create_server_socket(const Config *conf)
 //----------------------------------------------------------------------
     memset(&server_sockaddr, 0, sizeof server_sockaddr);
     server_sockaddr.sin_family = PF_INET;
-    server_sockaddr.sin_port = htons(atoi(conf->servPort.str()));
+    server_sockaddr.sin_port = htons(atoi(conf->servPort.c_str()));
 
 /*  if (inet_pton(PF_INET, addr, &(server_sockaddr.sin_addr)) < 1)
     {
@@ -57,7 +57,7 @@ int create_server_socket(const Config *conf)
         close(sockfd);
         return -1;
     }*/
-    server_sockaddr.sin_addr.s_addr = inet_addr(conf->host.str());
+    server_sockaddr.sin_addr.s_addr = inet_addr(conf->host.c_str());
     
     if (bind(sockfd, (struct sockaddr *) &server_sockaddr, sizeof (server_sockaddr)) == -1)
     {
@@ -172,7 +172,7 @@ int create_server_socket__(const Config *conf)
     hints.ai_socktype = SOCK_STREAM;
     hints.ai_flags = AI_PASSIVE;
 
-    if ((n = getaddrinfo(conf->host.str(), conf->servPort.str(), &hints, &servinfo)) != 0) 
+    if ((n = getaddrinfo(conf->host.c_str(), conf->servPort.c_str(), &hints, &servinfo)) != 0) 
     {
         fprintf(stderr, "Error getaddrinfo: %s;\n", gai_strerror(n));
         return -1;

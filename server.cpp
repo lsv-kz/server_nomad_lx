@@ -57,9 +57,9 @@ int main(int argc, char *argv[])
         exit(1);
     }
 //----------------------------------------------------------------------
-    if (chdir(conf->rootDir.str()))
+    if (chdir(conf->rootDir.c_str()))
     {
-        cerr << "!!! Error chdir(" << conf->rootDir.str()  << "): " << strerror(errno) << "\n";
+        cerr << "!!! Error chdir(" << conf->rootDir.c_str()  << "): " << strerror(errno) << "\n";
         cin.get();
         exit(1);
     }
@@ -70,10 +70,10 @@ int main(int argc, char *argv[])
         exit(1);
     }
     
-    cout << " [" << get_time().str() << "] - server \"" << conf->ServerSoftware.str() << "\" run\n"
+    cout << " [" << get_time().c_str() << "] - server \"" << conf->ServerSoftware.c_str() << "\" run\n"
          << "   pid = " << pid
-         << "\n   ip = " << conf->host.str()
-         << "\n   Port = " << conf->servPort.str()
+         << "\n   ip = " << conf->host.c_str()
+         << "\n   Port = " << conf->servPort.c_str()
          << "\n   ListenBacklog = " << conf->ListenBacklog
          << "\n   tcp_cork = " << conf->tcp_cork
          << "\n   TcpNoDelay = " << conf->TcpNoDelay
@@ -92,11 +92,11 @@ int main(int argc, char *argv[])
          << "\n   TimeoutKeepAlive = " << conf->TimeoutKeepAlive
          << "\n   TimeOut = " << conf->TimeOut
          << "\n   TimeoutCGI = " << conf->TimeoutCGI
-         << "\n\n   UsePHP: " << conf->UsePHP.str()
-         << "\n   PathPHP: " << conf->PathPHP.str()
-         << "\n   root_dir = " << conf->rootDir.str()
-         << "\n   cgi_dir = " << conf->cgiDir.str()
-         << "\n   log_dir = " << conf->logDir.str()
+         << "\n\n   UsePHP: " << conf->UsePHP.c_str()
+         << "\n   PathPHP: " << conf->PathPHP.c_str()
+         << "\n   root_dir = " << conf->rootDir.c_str()
+         << "\n   cgi_dir = " << conf->cgiDir.c_str()
+         << "\n   log_dir = " << conf->logDir.c_str()
          << "\n   ShowMediaFiles = " << conf->ShowMediaFiles
          << "\n   ClientMaxBodySize = " << conf->ClientMaxBodySize
          << "\n\n";

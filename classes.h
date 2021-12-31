@@ -100,11 +100,11 @@ class ClChunked
         {
             String ss(16);
             ss << Hex << size << "\r\n" << Dec;
-            len = ss.len();
+            len = ss.size();
             int n = MAX_LEN_SIZE_CHUNK - len;
             if (n < 0)
                 return -1;
-            memcpy(buf + n, ss.str(), len);
+            memcpy(buf + n, ss.c_str(), len);
             memcpy(buf + MAX_LEN_SIZE_CHUNK + i, "\r\n", 2);
             i += 2;
             p = buf + n;
@@ -175,7 +175,7 @@ public://---------------------------------------------------------------
     ClChunked & operator << (const String& s)
     {
         if (err) return *this;
-        *this << s.str();
+        *this << s.c_str();
         return *this;
     }
     //------------------------------------------------------------------

@@ -18,7 +18,7 @@ void create_logfiles(const String & log_dir, const String& ServerSoftware)
     strftime(buf, sizeof(buf), "%Y-m%m-%d_%Hh%Mm%Ss", &tm1);
 
     String fileName;
-    fileName.reserve(log_dir.len() + strlen(buf) + ServerSoftware.len() + 16);
+    fileName.reserve(log_dir.size() + strlen(buf) + ServerSoftware.size() + 16);
     fileName << log_dir;
     fileName << '/';
     fileName << buf;
@@ -26,10 +26,10 @@ void create_logfiles(const String & log_dir, const String& ServerSoftware)
     fileName << ServerSoftware;
     fileName << ".log";
 
-    flog = open(fileName.str(), O_CREAT | O_TRUNC | O_WRONLY, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH); // fopen(logfile, "w");
+    flog = open(fileName.c_str(), O_CREAT | O_TRUNC | O_WRONLY, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH); // fopen(logfile, "w");
     if(flog == -1)
     {
-        cerr << "  Error create log: " << fileName.str() << "\n";
+        cerr << "  Error create log: " << fileName.c_str() << "\n";
         exit(1);
     }
     
@@ -50,10 +50,10 @@ void create_logfiles(const String & log_dir, const String& ServerSoftware)
     fileName << ServerSoftware;
     fileName << "-error.log";
     
-    flog_err = open(fileName.str(), O_CREAT | O_TRUNC | O_WRONLY, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH); // fopen(logfile, "w");
+    flog_err = open(fileName.c_str(), O_CREAT | O_TRUNC | O_WRONLY, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH); // fopen(logfile, "w");
     if(flog_err == -1)
     {
-        cerr << "  Error create log_err: " << fileName.str() << "\n";
+        cerr << "  Error create log_err: " << fileName.c_str() << "\n";
         exit(1);
     }
     
@@ -86,7 +86,7 @@ void print_err(const char *format, ...)
     String ss(256);
     ss << "[" << get_time() << "] - " << buf;
 mtxLog.lock();
-    write(flog_err, ss.str(), ss.len());
+    write(flog_err, ss.c_str(), ss.size());
 mtxLog.unlock();
 }
 //======================================================================
@@ -103,7 +103,7 @@ void print_err(Connect *req, const char *format, ...)
     ss << "[" << get_time() << "]-[" << req->numChld << "/" << req->numConn << "/" << req->numReq << "] " << buf;
     
 mtxLog.lock();
-    write(flog_err, ss.str(), ss.len());
+    write(flog_err, ss.c_str(), ss.size());
 mtxLog.unlock();
 }
 //======================================================================
@@ -125,6 +125,6 @@ void print_log(Connect *req)
             << "\""
             << " " << req->connKeepAlive << "\n";
 mtxLog.lock();
-    write(flog, ss.str(), ss.len());
+    write(flog, ss.c_str(), ss.size());
 mtxLog.unlock();
 }

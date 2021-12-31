@@ -25,7 +25,7 @@ OBJS = $(OBJSDIR)/server.o \
 server: $(OBJS)
 	$(CC) $(CFLAGS) -o $@  $(OBJS) -lpthread
 
-$(OBJSDIR)/server.o: server.cpp main.h
+$(OBJSDIR)/server.o: server.cpp main.h String.h
 	$(CC) $(CFLAGS) -c server.cpp -o $@
 
 $(OBJSDIR)/classes.o: classes.cpp main.h classes.h String.h
@@ -37,16 +37,16 @@ $(OBJSDIR)/send_headers.o: send_headers.cpp main.h classes.h String.h
 $(OBJSDIR)/config.o: config.cpp main.h String.h
 	$(CC) $(CFLAGS) -c config.cpp -o $@
 
-$(OBJSDIR)/threads_manager.o: threads_manager.cpp main.h
+$(OBJSDIR)/threads_manager.o: threads_manager.cpp main.h String.h
 	$(CC) $(CFLAGS) -c threads_manager.cpp -o $@
 
 $(OBJSDIR)/response.o: response.cpp main.h classes.h String.h
 	$(CC) $(CFLAGS) -c response.cpp -o $@
 
-$(OBJSDIR)/event_handler.o: event_handler.cpp main.h
+$(OBJSDIR)/event_handler.o: event_handler.cpp main.h String.h
 	$(CC) $(CFLAGS) -c event_handler.cpp -o $@
 
-$(OBJSDIR)/create_socket.o: create_socket.cpp main.h
+$(OBJSDIR)/create_socket.o: create_socket.cpp main.h String.h
 	$(CC) $(CFLAGS) -c create_socket.cpp -o $@
 
 $(OBJSDIR)/percent_coding.o: percent_coding.cpp main.h
@@ -64,7 +64,7 @@ $(OBJSDIR)/log.o: log.cpp main.h String.h
 $(OBJSDIR)/cgi.o: cgi.cpp main.h classes.h String.h
 	$(CC) $(CFLAGS) -c cgi.cpp -o $@
 
-$(OBJSDIR)/fcgi.o: fcgi.cpp main.h classes.h String.h fcgi.h
+$(OBJSDIR)/fcgi.o: fcgi.cpp main.h classes.h fcgi.h String.h
 	$(CC) $(CFLAGS) -c fcgi.cpp -o $@
 
 $(OBJSDIR)/index.o: index.cpp main.h classes.h String.h

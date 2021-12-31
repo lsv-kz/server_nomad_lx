@@ -315,7 +315,7 @@ write(STDERR_FILENO, "\n", 1);
 int send_largefile(Connect *req, char *buf, int size, off_t offset, long long *cont_len)
 {
     int rd, wr;
-    
+
     lseek(req->resp.fd, offset, SEEK_SET);
 
     for ( ; *cont_len > 0; )

@@ -252,7 +252,7 @@ int ArrayRanges::get_ranges(char *s, long long sz)
             return 0;
         }
         
-        const char *p = ss.str();
+        const char *p = ss.c_str();
         char *pp;
         for (int i = 0; i < numPart; ++i)
         {
