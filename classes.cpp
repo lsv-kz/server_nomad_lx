@@ -33,10 +33,13 @@
     
     int Connect::hd_read()
     {
+        errno = 0;
         if (err) return -1;
         int n = recv(clientSocket, bufReq + i_bufReq, LEN_BUF_REQUEST - i_bufReq - 1, 0);
-        if (n <= 0)
+        if (n < 0)
             return -1;
+        else if (n == 0)
+            return NO_PRINT_LOG;
 
         lenTail += n;
         

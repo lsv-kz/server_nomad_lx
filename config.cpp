@@ -467,4 +467,8 @@ void free_fcgi_list()
         if (prev) delete prev;
     }
 }
-
+//======================================================================
+void set_sndbuf(int n)
+{
+    c.WR_BUFSIZE = n;
+}

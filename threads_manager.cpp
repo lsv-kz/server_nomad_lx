@@ -160,13 +160,11 @@ unique_lock<mutex> lk(mtx_conn);
     return 0;
 }
 //======================================================================
-static int nChld;
-//----------------------------------------------------------------------
 void end_response(Connect *req)
 {
     if (req->connKeepAlive == 0 || req->err < 0)
     { // ----- Close connect -----
-        if (req->err == 0)
+        if (req->err > NO_PRINT_LOG)
             print_log(req);
         shutdown(req->clientSocket, SHUT_RDWR);
         close(req->clientSocket);
@@ -218,23 +216,15 @@ void thr_create_manager(int numProc, RequestManager *ReqMan)
 //    print_err("[%d] <%s:%d> *** Exit thread_req_manager() ***\n", numProc, __func__, __LINE__);
 }
 //======================================================================
+static int nChld;
 static int servSock;
 static RequestManager *RM;
 static unsigned long allConn = 0;
-//======================================================================
-void RequestManager::print_intr()
-{
-mtx_thr.lock();
-    print_err("[%d]<%s:%d> thr=%d, open_conn=%d, qu=%d, num_wait_thr=%d\n", numChld, __func__, __LINE__, 
-                                count_thr, count_conn, size_list, num_wait_thr);
-mtx_thr.unlock();
-}
 //======================================================================
 static void signal_handler(int sig)
 {
     if (sig == SIGINT)
     {
-  //      RM->print_intr();
         print_err("[%d] <%s:%d> ### SIGINT ### all_conn=%d\n", nChld, __func__, __LINE__, allConn);
         shutdown(servSock, SHUT_RDWR);
         close(servSock);
@@ -311,7 +301,7 @@ void manager(int sockServer, int numChld)
     }
     catch (...)
     {
-        print_err("<%s:%d> Error create thread %d: errno=%d \n", __func__, 
+        print_err("<%s:%d> Error create thread %d: errno=%d\n", __func__, 
                 __LINE__, ReqMan->get_all_thr(), errno);
         exit(errno);
     }
@@ -347,19 +337,14 @@ void manager(int sockServer, int numChld)
         }
 /*
         int flags = fcntl(clientSocket, F_GETFL);
-        if (flags == -1)
-            print_err("<%s:%d> Error fcntl(, F_GETFL, ): %s\n", __func__, __LINE__, strerror(errno));
-        else
-        {
-            if (fcntl(clientSocket, F_SETFL, flags | O_NONBLOCK) == -1)
-                print_err("<%s:%d> Error fcntl(, F_SETFL, ): %s\n", __func__, __LINE__, strerror(errno));
-        }
+        if (flags != -1)
+            fcntl(clientSocket, F_SETFL, flags | O_NONBLOCK);
 */
         int opt = 1;
         ioctl(clientSocket, FIONBIO, &opt);
 
         req->numChld = numChld;
-        req->numConn = ++allConn;
+        req->numConn = allConn++;
         req->numReq = 0;
         req->clientSocket = clientSocket;
         req->timeout = conf->TimeOut;
@@ -384,9 +369,9 @@ void manager(int sockServer, int numChld)
     
     close_event_handler();
     EventHandler.join();
-
-    delete ReqMan;
+    
     sleep(1);
+    delete ReqMan;
     print_err("[%d] <%s:%d> ***** Exit *****\n", numChld, __func__, __LINE__);
 }
 //======================================================================

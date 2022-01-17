@@ -14,7 +14,7 @@ void response1(RequestManager *ReqMan)
         req = ReqMan->pop_resp_list();
         if (!req)
         {
-            print_err("[%d] <%s:%d>  req = NULL\n", ReqMan->get_num_chld(), __func__, __LINE__);
+            //print_err("[%d] <%s:%d>  req = NULL\n", ReqMan->get_num_chld(), __func__, __LINE__);
             ReqMan->end_thr(1);
             return;
         }
@@ -214,10 +214,9 @@ int response2(Connect *req)
         if (stat(req->decodeUri + 1, &st) == -1)
         {
             print_err(req, "<%s:%d> script (%s) not found\n", __func__, __LINE__, req->decodeUri);
-//            return -RS404;
+            return -RS404;
         }
-   //     String s = req->decodeUri;
-   //     req->resp.scriptName = s.c_str();
+
         req->resp.scriptName = req->decodeUri;
 
         if (conf->UsePHP == "php-fpm")
@@ -242,10 +241,7 @@ int response2(Connect *req)
     {
         int ret;
         req->resp.scriptType = cgi_ex;
-        
-    //    String s = req->decodeUri;
-        req->resp.scriptName = req->decodeUri;//s.c_str();
-
+        req->resp.scriptName = req->decodeUri;
         ret = cgi(req);
         return ret;
     }
@@ -321,7 +317,7 @@ int response2(Connect *req)
                     String s = req->decodeUri;
                     s << "index.php";
                     req->resp.scriptName = s.c_str();
-                    
+
                     if (conf->UsePHP == "php-fpm")
                     {
                         req->resp.scriptType = php_fpm;

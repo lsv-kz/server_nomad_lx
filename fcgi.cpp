@@ -50,7 +50,7 @@ int fcgi_read_headers(char *s, int len, String *hdrs, int *stat)
 {
     char *start_ptr = s;
     int i = len;
-//hex_dump_stderr(__func__, __LINE__, s, len);
+
     while (1)
     {
         char *end_ptr;
@@ -72,7 +72,8 @@ int fcgi_read_headers(char *s, int len, String *hdrs, int *stat)
             
             if (n == 0)
                 break;
-            
+/*fwrite(start_ptr, 1, n, stderr);
+fprintf(stderr, "\n");*/
             if(!strncmp("Status", start_ptr, 6))
             {
                 *(start_ptr + n) = 0;
@@ -97,7 +98,6 @@ int fcgi_read_headers(char *s, int len, String *hdrs, int *stat)
 //======================================================================
 int fcgi_(Connect *req, int fcgi_sock, FCGI_client & Fcgi)
 {
-//print_err("<%s:%d> -------------------------\n", __func__, __LINE__);
     if(req->reqMethod == M_POST)
     {
         if (req->tail)
@@ -118,7 +118,7 @@ int fcgi_(Connect *req, int fcgi_sock, FCGI_client & Fcgi)
             int ret = read_timeout(req->clientSocket, buf, rd, conf->TimeOut);
             if (ret < 0)
             {
-                print_err(req, "<%s:%d> Error: reaf_from_client()\n", __func__, __LINE__);
+                print_err(req, "<%s:%d> Error: reaf_from_client(): %d\n", __func__, __LINE__, ret);
                 return ret;
             }
             
@@ -164,7 +164,7 @@ int fcgi_(Connect *req, int fcgi_sock, FCGI_client & Fcgi)
     
     while (1)
     {
-        int n = Fcgi.fcgi_stdout(&p);// read_from_server
+        int n = Fcgi.fcgi_stdout(&p);
         if (n < 0)
         {
             printf("<%s:%d> Error Fcgi.read_from_server()\n", __func__, __LINE__);
@@ -194,7 +194,7 @@ int fcgi_(Connect *req, int fcgi_sock, FCGI_client & Fcgi)
                         return 0;
                     }
                 }
-//print_err(req, "<%s:%d> n=%d, tail=%d\n", __func__, __LINE__, n, tail);
+
                 chunk.add_arr(p + tail, n - tail);
             }
             else
@@ -210,7 +210,6 @@ int fcgi_(Connect *req, int fcgi_sock, FCGI_client & Fcgi)
     }
     
     int ret = chunk.end();
-//print_err("<%s:%d> chunk.all() = %d\n", __func__, __LINE__, chunk.all());
     req->resp.respContentLength = chunk.len_entity();
     if (ret < 0)
     {
@@ -220,7 +219,6 @@ int fcgi_(Connect *req, int fcgi_sock, FCGI_client & Fcgi)
     
     if (chunk_mode == NO_SEND)
     {
-//print_err("<%s:%d> chunk.all() = %d\n", __func__, __LINE__, chunk.all());
         if (send_response_headers(req, &hdrs))
         {
             print_err("<%s:%d> Error send_header_response()\n", __func__, __LINE__);
@@ -235,7 +233,6 @@ int fcgi_(Connect *req, int fcgi_sock, FCGI_client & Fcgi)
 //======================================================================
 int fcgi_send_param(Connect *req, int fcgi_sock)
 {
-//print_err("<%s:%d> -------------------------\n", __func__, __LINE__);
     FCGI_client Fcgi(fcgi_sock, conf->TimeoutCGI);
     if (req->resp.scriptType == php_fpm)
         Fcgi.add("REDIRECT_STATUS", "true");

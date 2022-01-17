@@ -70,6 +70,8 @@ enum { cgi_ex = 1, php_cgi, php_fpm, fast_cgi };
 
 enum { EXIT_THR = 1 };
 
+const int NO_PRINT_LOG = -1000;
+
 void print_err(const char *format, ...);
 //----------------------------------------------------------------------
 struct Config

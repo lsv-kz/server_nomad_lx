@@ -1,10 +1,12 @@
 #include <sys/un.h>
 #include "main.h"
 
+void set_sndbuf(int n);
 //======================================================================
 int create_server_socket(const Config *conf)
 {
-    int sockfd, sock_opt = 1;
+    int sockfd;
+    const int sock_opt = 1;
     socklen_t optlen;
     int sndbuf = 0;
     struct sockaddr_in server_sockaddr;
@@ -32,21 +34,20 @@ int create_server_socket(const Config *conf)
             return -1;
         }
     }
-    
-//    ioctl(sockfd, FIONBIO, &sock_opt);
-//----------------------------------------------------------------------
+    //------------------------------------------------------------------
     optlen = sizeof(sndbuf);
     if (getsockopt(sockfd, SOL_SOCKET, SO_SNDBUF, (void *)&sndbuf, &optlen))
     {
         print_err("<%s:%d> Error getsockopt(SO_SNDBUF): %s\n", __func__, __LINE__, strerror(errno));
-        exit(1);
+        return -1;
     }
     else
     {
-        printf("<%s:%d> SO_SNDBUF=%d\n", __func__, __LINE__, sndbuf);
         printf("<%s:%d> WR_BUFSIZE=%d\n", __func__, __LINE__, conf->WR_BUFSIZE);
+        printf("<%s:%d> SO_SNDBUF=%d\n", __func__, __LINE__, sndbuf);
+        set_sndbuf(sndbuf);
     }
-//----------------------------------------------------------------------
+    //------------------------------------------------------------------
     memset(&server_sockaddr, 0, sizeof server_sockaddr);
     server_sockaddr.sin_family = PF_INET;
     server_sockaddr.sin_port = htons(atoi(conf->servPort.c_str()));
@@ -77,10 +78,10 @@ int create_server_socket(const Config *conf)
     
     return sockfd;
 }
-/*====================================================================*/
+//======================================================================
 int create_fcgi_socket(const char *host)
 {
-    int sockfd, n;//, sock_opt = 1;
+    int sockfd, n;
     char addr[256];
     char port[16];
     
@@ -88,9 +89,8 @@ int create_fcgi_socket(const char *host)
     n = sscanf(host, "%[^:]:%s", addr, port);
     if(n == 2) //==== AF_INET ====
     {
-        int sock_opt = 1;
+        const int sock_opt = 1;
         struct sockaddr_in sock_addr;
-//printf("%s-%s; %d\n", addr, port, n);
         memset(&sock_addr, 0, sizeof(sock_addr));
 
         sockfd = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
@@ -124,7 +124,6 @@ int create_fcgi_socket(const char *host)
     }
     else //==== PF_UNIX ====
     {
-//printf("%s; %d\n", addr, n);
         struct sockaddr_un sock_addr;
         sockfd = socket (PF_UNIX, SOCK_STREAM, 0);
         if (sockfd == -1)
@@ -158,11 +157,11 @@ int create_fcgi_socket(const char *host)
 
     return sockfd;
 }
-/*====================================================================*/
-int create_server_socket__(const Config *conf)
+//======================================================================
+int create_server_socket_(const Config *conf)
 {
-    int sockfd;
-    int n, sock_opt = 1;
+    int sockfd, n;
+    const int sock_opt = 1;
     socklen_t optlen;
     int sndbuf = 0;
     struct addrinfo  hints, *servinfo, *p_sock;
@@ -185,35 +184,31 @@ int create_server_socket__(const Config *conf)
             perror("server: socket");
             continue;
         }
-        
+
         if (setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &sock_opt, sizeof(int)) == -1)
         {
             perror("setsockopt");
-            exit(1);
+            return -1;
         }
-        
-        if(setsockopt(sockfd, IPPROTO_TCP, TCP_NODELAY, (void *)&sock_opt, sizeof(sock_opt)))
+
+        if (setsockopt(sockfd, IPPROTO_TCP, TCP_NODELAY, (void *)&sock_opt, sizeof(sock_opt)))
         {
             print_err("<%s:%d> setsockopt: unable to set TCP_NODELAY: %s\n", __func__, __LINE__, strerror(errno));
             return -1;
         }
         
-        sndbuf = conf->WR_BUFSIZE;
-        if (setsockopt(sockfd, SOL_SOCKET, SO_SNDBUF, (void *)&sndbuf, sizeof(sndbuf)))
-        {
-            print_err("<%s:%d> Error setsockopt(SO_SNDBUF): %s\n", __func__, __LINE__, strerror(errno));
-            return -1;
-        }
-    
         optlen = sizeof sndbuf;
-        if(getsockopt(sockfd, SOL_SOCKET, SO_SNDBUF, (void *)&sndbuf, &optlen))
+        if (getsockopt(sockfd, SOL_SOCKET, SO_SNDBUF, (void *)&sndbuf, &optlen))
         {
             print_err("<%s:%d> Error getsockopt(SO_SNDBUF): %s\n", __func__, __LINE__, strerror(errno));
             return -1;
         }
-    
-        assert(optlen == sizeof(sndbuf));
-        printf("sndbuf=%d\n", sndbuf);
+        else
+        {
+            printf("<%s:%d> WR_BUFSIZE=%d\n", __func__, __LINE__, conf->WR_BUFSIZE);
+            printf("<%s:%d> SO_SNDBUF=%d\n", __func__, __LINE__, sndbuf);
+            set_sndbuf(sndbuf);
+        }
         
         if (bind(sockfd, p_sock->ai_addr, p_sock->ai_addrlen) == -1) 
         {
@@ -234,7 +229,6 @@ int create_server_socket__(const Config *conf)
     if (listen(sockfd, conf->ListenBacklog) == -1) 
     {
         perror("listen");
-        getchar();
         return -1;
     }
 

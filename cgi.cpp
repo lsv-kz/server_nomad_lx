@@ -36,7 +36,8 @@ mtx_chld.unlock();
 const char *get_script_name(const char *name)
 {
     const char *p;
-    if (!name) return "";
+    if (!name)
+        return "";
 
     if ((p = strchr(name + 1, '/')))
         return p;
@@ -93,7 +94,6 @@ int cgi_chunk(Connect *req, String *hdrs, int cgi_serv_in, pid_t pid, char *tail
         chunk = ((req->httpProt == HTTP11) && req->connKeepAlive) ? SEND_CHUNK : SEND_NO_CHUNK;
     
     ClChunked chunk_buf(req, chunk);
-//print_err(req, "<%s:%d> ---------------\n", __func__, __LINE__);
     //------------ read from script -------------
     if (req->reqMethod == M_HEAD)
     {
@@ -159,7 +159,7 @@ int cgi_chunk(Connect *req, String *hdrs, int cgi_serv_in, pid_t pid, char *tail
 int cgi_read_headers(Connect *req, int cgi_serv_in, pid_t pid)
 {
     req->resp.respStatus = RS200;
-//print_err(req, "<%s:%d> ---------------\n", __func__, __LINE__);
+
     String hdrs(256);
     if (hdrs.error())
     {
@@ -276,7 +276,7 @@ int cgi_read_headers(Connect *req, int cgi_serv_in, pid_t pid)
         print_err(req, "<%s:%d> %s\n ReadFromScript=%d\n", __func__, __LINE__, err_str, ReadFromScript);
         return kill_script(req, pid, RS500, err_str);
     }
-//print_err(req, "<%s:%d> tail=%d\n", __func__, __LINE__, ReadFromScript);
+
     int ret = cgi_chunk(req, &hdrs, cgi_serv_in, pid, start_ptr, ReadFromScript);
     close(cgi_serv_in);
     if (ret < 0)
@@ -287,7 +287,6 @@ int cgi_read_headers(Connect *req, int cgi_serv_in, pid_t pid)
 //======================================================================
 int cgi_fork(Connect *req, int *serv_cgi, int *cgi_serv, String& path)
 {
-//print_err("<%s:%d> ----------------------------------\n", __func__, __LINE__);
     int wr_bytes, n;
     //--------------------------- fork ---------------------------------
     pid_t pid = fork();
@@ -330,7 +329,6 @@ int cgi_fork(Connect *req, int *serv_cgi, int *cgi_serv, String& path)
         setenv("GATEWAY_INTERFACE", "CGI/1.1", 1);
         setenv("DOCUMENT_ROOT", conf->rootDir.c_str(), 1);
         setenv("REMOTE_ADDR", req->remoteAddr, 1);
-//      setenv("REMOTE_HOST", req->remote_addr, 1);
         setenv("REMOTE_PORT", req->remotePort, 1);
         setenv("REQUEST_URI", req->uri, 1);
         setenv("REQUEST_METHOD", get_str_method(req->reqMethod), 1);

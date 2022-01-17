@@ -111,7 +111,7 @@ void print_log(Connect *req)
 {
     String ss(256);
         
-    ss << req->numChld << "/" << req->numConn << "/" << req->numReq << " - " << req->remoteAddr << ":" << req->remotePort
+    ss << req->numChld << "/" << req->numConn << "/" << req->numReq << " - " << req->remoteAddr
             << " - [" << req->resp.sLogTime << "] - ";
     if (req->reqMethod > 0)
             ss << "\"" << get_str_method(req->reqMethod) << " " << req->uri
@@ -123,7 +123,7 @@ void print_log(Connect *req)
             << "\"" << ((req->req_hdrs.iReferer >= 0) ? req->req_hdrs.Value[req->req_hdrs.iReferer] : "-") << "\" "
             << "\"" << ((req->req_hdrs.iUserAgent >= 0) ? req->req_hdrs.Value[req->req_hdrs.iUserAgent] : "-")
             << "\""
-            << " " << req->connKeepAlive << "\n";
+            << " " << (req->connKeepAlive ? "KeepAlive" : "Close") << "\n";
 mtxLog.lock();
     write(flog, ss.c_str(), ss.size());
 mtxLog.unlock();

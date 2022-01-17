@@ -232,7 +232,6 @@ public://---------------------------------------------------------------
             int ret = read_timeout(fdPipe, buf + MAX_LEN_SIZE_CHUNK + i, rd, conf->TimeoutCGI);
             if (ret == 0)
             {
-       //         print_err("<%s:%d> ret=%d, all_rd=%d\n", __func__, __LINE__, ret, all_rd);
                 break;
             }
             else if (ret < 0)
