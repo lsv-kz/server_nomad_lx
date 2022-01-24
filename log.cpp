@@ -78,10 +78,10 @@ void close_logs(void)
 void print_err(const char *format, ...)
 {
     va_list ap;
-    char buf[MAX_PATH * 2];
+    char buf[128];
 
     va_start(ap, format);
-    vsnprintf(buf, MAX_PATH * 2, format, ap);
+    vsnprintf(buf, sizeof(buf), format, ap);
     va_end(ap);
     String ss(256);
     ss << "[" << get_time() << "] - " << buf;
@@ -93,10 +93,10 @@ mtxLog.unlock();
 void print_err(Connect *req, const char *format, ...)
 {
     va_list ap;
-    char buf[MAX_PATH * 2];
+    char buf[128];
 
     va_start(ap, format);
-    vsnprintf(buf, MAX_PATH * 2, format, ap);
+    vsnprintf(buf, sizeof(buf), format, ap);
     va_end(ap);
     
     String ss(256);
@@ -109,7 +109,7 @@ mtxLog.unlock();
 //======================================================================
 void print_log(Connect *req)
 {
-    String ss(256);
+    String ss(320);
         
     ss << req->numChld << "/" << req->numConn << "/" << req->numReq << " - " << req->remoteAddr
             << " - [" << req->resp.sLogTime << "] - ";

@@ -59,7 +59,7 @@ int create_conf_file(const char *path)
     
     fconf << "ListenBacklog " << c.ListenBacklog << "\n\n";
     
-    fconf << "WrBufSize   " << c.WR_BUFSIZE << "\n";
+    fconf << "SndBufSize   " << c.SNDBUF_SIZE << "\n";
     fconf << "MaxRequests " << c.MAX_REQUESTS << "\n\n";
     
     fconf << "SendFile  " << c.SEND_FILE << "\n";
@@ -185,8 +185,8 @@ void read_conf_file(const char *path_conf)
             ss >> c.SEND_FILE;
         else if (s == "TimeoutPoll")
             ss >> c.TIMEOUT_POLL;
-        else if (s == "WrBufSize")
-            ss >> c.WR_BUFSIZE;
+        else if (s == "SndBufSize")
+            ss >> c.SNDBUF_SIZE;
         else if (s == "MaxRequests")
             ss >> c.MAX_REQUESTS;
         else if (s == "NumChld")
@@ -470,5 +470,5 @@ void free_fcgi_list()
 //======================================================================
 void set_sndbuf(int n)
 {
-    c.WR_BUFSIZE = n;
+    c.SNDBUF_SIZE = n;
 }

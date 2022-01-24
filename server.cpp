@@ -77,7 +77,7 @@ int main(int argc, char *argv[])
          << "\n   ListenBacklog = " << conf->ListenBacklog
          << "\n   tcp_cork = " << conf->tcp_cork
          << "\n   TcpNoDelay = " << conf->TcpNoDelay
-         << "\n   WrBufSize = " << conf->WR_BUFSIZE
+         << "\n   SndBufSize = " << conf->SNDBUF_SIZE
          << "\n   SendFile = " << conf->SEND_FILE
          << "\n   MaxRequests = " << conf->MAX_REQUESTS
          

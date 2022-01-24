@@ -27,13 +27,10 @@ void get_time(String& str)
     str = s;
 }
 /*====================================================================*/
-const char *strstr_case(const char *str1, const char *str2)
+const char *strstr_case(const char *s1, const char *s2)
 {
-    const char *s1, *p1, *s2, *p2;
+    const char *p1, *p2;
     char c1, c2;
-    
-    s1 = str1;
-    s2 = str2;
     
     if (!s1 || !s2) return NULL;
     if (*s2 == 0) return s1;

@@ -422,7 +422,7 @@ int response2(Connect *req)
     
     if (req->resp.numPart > 1)
     {
-        int size = conf->WR_BUFSIZE;
+        int size = conf->SNDBUF_SIZE;
         char *rd_buf = new(nothrow) char [size];
         if (!rd_buf)
         {

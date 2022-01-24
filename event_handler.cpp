@@ -147,20 +147,12 @@ mtx_.unlock();
     return i;
 }
 //======================================================================
-int ff(Connect *r)
-{
-    if (r->connKeepAlive == 0 || r->err < 0)
-        return 1;
-    else
-        return 0;
-}
-//======================================================================
 void event_handler(RequestManager *ReqMan)
 {
     int num_chld = ReqMan->get_num_chld();
     int count_resp = 0;
     int ret = 1, n, wr;
-    int size_buf = conf->WR_BUFSIZE;
+    int size_buf = conf->SNDBUF_SIZE;
     char *rd_buf = NULL;
     
     if (conf->SEND_FILE != 'y')

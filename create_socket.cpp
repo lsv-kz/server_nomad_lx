@@ -36,16 +36,10 @@ int create_server_socket(const Config *conf)
     }
     //------------------------------------------------------------------
     optlen = sizeof(sndbuf);
-    if (getsockopt(sockfd, SOL_SOCKET, SO_SNDBUF, (void *)&sndbuf, &optlen))
+    if (!getsockopt(sockfd, SOL_SOCKET, SO_SNDBUF, (void *)&sndbuf, &optlen))
     {
-        print_err("<%s:%d> Error getsockopt(SO_SNDBUF): %s\n", __func__, __LINE__, strerror(errno));
-        return -1;
-    }
-    else
-    {
-        printf("<%s:%d> WR_BUFSIZE=%d\n", __func__, __LINE__, conf->WR_BUFSIZE);
+        printf("<%s:%d> SNDBUF_SIZE=%d\n", __func__, __LINE__, conf->SNDBUF_SIZE);
         printf("<%s:%d> SO_SNDBUF=%d\n", __func__, __LINE__, sndbuf);
-        set_sndbuf(sndbuf);
     }
     //------------------------------------------------------------------
     memset(&server_sockaddr, 0, sizeof server_sockaddr);
@@ -85,7 +79,9 @@ int create_fcgi_socket(const char *host)
     char addr[256];
     char port[16];
     
-    if (!host) return -1;
+    if (!host)
+        return -1;
+    
     n = sscanf(host, "%[^:]:%s", addr, port);
     if(n == 2) //==== AF_INET ====
     {
@@ -198,16 +194,10 @@ int create_server_socket_(const Config *conf)
         }
         
         optlen = sizeof sndbuf;
-        if (getsockopt(sockfd, SOL_SOCKET, SO_SNDBUF, (void *)&sndbuf, &optlen))
+        if (!getsockopt(sockfd, SOL_SOCKET, SO_SNDBUF, (void *)&sndbuf, &optlen))
         {
-            print_err("<%s:%d> Error getsockopt(SO_SNDBUF): %s\n", __func__, __LINE__, strerror(errno));
-            return -1;
-        }
-        else
-        {
-            printf("<%s:%d> WR_BUFSIZE=%d\n", __func__, __LINE__, conf->WR_BUFSIZE);
+            printf("<%s:%d> SNDBUF_SIZE=%d\n", __func__, __LINE__, conf->SNDBUF_SIZE);
             printf("<%s:%d> SO_SNDBUF=%d\n", __func__, __LINE__, sndbuf);
-            set_sndbuf(sndbuf);
         }
         
         if (bind(sockfd, p_sock->ai_addr, p_sock->ai_addrlen) == -1) 

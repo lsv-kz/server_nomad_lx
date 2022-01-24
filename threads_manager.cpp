@@ -101,7 +101,7 @@ unique_lock<mutex> lk(mtx_thr);
 int RequestManager::wait_create_thr(int *n)
 {
 unique_lock<mutex> lk(mtx_thr);
-    while (((num_wait_thr >= 1) || (count_thr >= conf->MaxThreads) || !count_conn) && !stop_manager)
+    while (((size_list <= num_wait_thr) || (count_thr >= conf->MaxThreads)) && !stop_manager)
     {
         cond_new_thr.wait(lk);
     }
@@ -114,7 +114,7 @@ int RequestManager::end_thr(int ret)
 {
 mtx_thr.lock();
     
-    if (((count_thr > conf->MinThreads) && (size_list <= num_wait_thr)) || ret)
+    if (((count_thr > conf->MinThreads) && (size_list < num_wait_thr)) || ret)
     {
         --count_thr;
         ret = EXIT_THR;
@@ -124,7 +124,6 @@ mtx_thr.unlock();
     if (ret)
     {
         cond_exit_thr.notify_all();
-        cond_new_thr.notify_all();
     }
     return ret;
 }
@@ -335,11 +334,7 @@ void manager(int sockServer, int numChld)
             close(clientSocket);
             continue;
         }
-/*
-        int flags = fcntl(clientSocket, F_GETFL);
-        if (flags != -1)
-            fcntl(clientSocket, F_SETFL, flags | O_NONBLOCK);
-*/
+        
         int opt = 1;
         ioctl(clientSocket, FIONBIO, &opt);
 

@@ -87,7 +87,7 @@ struct Config
     int MaxRequestsPerThr = 50;
     int MaxChldsCgi = 5;
     int ListenBacklog = 128;
-    int WR_BUFSIZE = 16284;
+    int SNDBUF_SIZE = 16284;
     int TIMEOUT_POLL = 10;
     char SEND_FILE = 'n';
     int MAX_REQUESTS = 256;
@@ -308,7 +308,6 @@ int timedwait_close_cgi(int numChld, int MaxChldsCgi);
 void cgi_dec();
 //----------------------------------------------------------------------
 void end_response(Connect *req);
-
 //----------------------------------------------------------------------
 void event_handler(RequestManager *ReqMan);
 void push_pollin_list(Connect *req);
