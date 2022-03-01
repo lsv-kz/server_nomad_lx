@@ -330,7 +330,7 @@ int fcgi(Connect *req)
         }
     }
     
-    if (timedwait_close_cgi(req->numChld, conf->MaxChldsCgi))
+    if (timedwait_close_cgi(conf->MaxChldsCgi))
     {
         return -1;
     }

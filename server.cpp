@@ -30,48 +30,28 @@ pid_t create_child(int num_chld);
 int main(int argc, char *argv[])
 {
     if (argc == 1)
-    {
         read_conf_file(".");
-    }
     else
-    {
         read_conf_file(argv[1]);
-    }
     
     if (signal(SIGPIPE, SIG_IGN) == SIG_ERR)
     {
-        cerr << "   Error signal(SIGPIPE,)!\n";
-        cin.get();
+        fprintf(stderr, "<%s:%d> Error signal(SIGPIPE): %s\n", __func__, __LINE__, strerror(errno));
         exit(EXIT_FAILURE);
     }
 
     pid_t pid = getpid();
-//----------------------------------------------------------------------
+    //------------------------------------------------------------------
     sockServer = create_server_socket(conf);
     if (sockServer == -1)
     {
-        cerr << "<" << __LINE__ << ">   server: failed to bind\n";
+        fprintf(stderr, "<%s:%d> Error: create_server_socket()=%d\n", __func__, __LINE__, sockServer);
         free_fcgi_list();
         close_logs();
-        cin.get();
         exit(1);
     }
-//----------------------------------------------------------------------
-    if (chdir(conf->rootDir.c_str()))
-    {
-        cerr << "!!! Error chdir(" << conf->rootDir.c_str()  << "): " << strerror(errno) << "\n";
-        cin.get();
-        exit(1);
-    }
-//----------------------------------------------------------------------
-    if ((conf->NumChld < 1) || (conf->NumChld > 6))
-    {
-        print_err("<%s:%d> Error Number of Processes = %d; [1 < NumChld <= 6]\n", __func__, __LINE__, conf->NumChld);
-        exit(1);
-    }
-    
+    //------------------------------------------------------------------
     cout << " [" << get_time().c_str() << "] - server \"" << conf->ServerSoftware.c_str() << "\" run\n"
-         << "   pid = " << pid
          << "\n   ip = " << conf->host.c_str()
          << "\n   Port = " << conf->servPort.c_str()
          << "\n   ListenBacklog = " << conf->ListenBacklog
@@ -101,8 +81,9 @@ int main(int argc, char *argv[])
          << "\n   ClientMaxBodySize = " << conf->ClientMaxBodySize
          << "\n\n";
 
-    cerr << "  uid=" << getuid() << "; gid=" << getgid() << "\n\n";
-    cout << "  uid=" << getuid() << "; gid=" << getgid() << "\n\n";
+    cerr << "   uid=" << getuid() << "; gid=" << getgid() << "\n\n";
+    cout << "   uid=" << getuid() << "; gid=" << getgid() << "\n\n";
+    cout << "   pid main proc: "  << pid <<  "\n";
     //------------------------------------------------------------------
     for ( ; environ[0]; )
     {
@@ -112,13 +93,6 @@ int main(int argc, char *argv[])
             *(p - 1) = 0;
             unsetenv(buf);
         }
-    }
-
-    if (conf->MinThreads > conf->MaxThreads)
-    {
-        cerr << "<" << __func__ << "():" << __LINE__ << "> Error: NumThreads > MaxThreads\n";
-        cin.get();
-        exit(1);
     }
     
     Connect::serverSocket = sockServer;
@@ -139,24 +113,21 @@ int main(int argc, char *argv[])
 
     if (signal(SIGINT, signal_handler) == SIG_ERR)
     {
-        cerr << "   Error signal(SIGINT)\n";
         print_err("<%s:%d> Error signal(SIGINT): %s\n", __func__, __LINE__, strerror(errno));
         exit(EXIT_FAILURE);
     }
 
     if (signal(SIGSEGV, signal_handler) == SIG_ERR)
     {
-        cerr << "   Error signal(SIGSEGV)!\n";
         print_err("<%s:%d> Error signal(SIGSEGV): %s\n", __func__, __LINE__, strerror(errno));
         exit(EXIT_FAILURE);
     }
-
+    
     close(sockServer);
 
     while ((pid = wait(NULL)) != -1)
     {
         print_err("<> wait() pid: %d\n", pid);
-        continue;
     }
 
     free_fcgi_list();
@@ -182,17 +153,13 @@ pid_t create_child(int num_chld)
         {
             if (setgid(conf->server_gid) == -1)
             {
-                perror("setgid");
-                cout << "[" << __func__ << "] Error setgid(" << conf->server_gid << "): " << strerror(errno) << "\n";
-                cin.get();
+                fprintf(stderr, "<%s:%d> Error setgid(%u): %s\n", __func__, __LINE__, conf->server_gid, strerror(errno));
                 exit(1);
             }
             
             if (setuid(conf->server_gid) == -1)
             {
-                perror("setuid");
-                cout << "[" << __func__ << "] Error setuid(" << conf->server_uid << "): " << strerror(errno) << "\n";
-                cin.get();
+                fprintf(stderr, "<%s:%d> Error setuid(%u): %s\n", __func__, __LINE__, conf->server_gid, strerror(errno));
                 exit(1);
             }
         }

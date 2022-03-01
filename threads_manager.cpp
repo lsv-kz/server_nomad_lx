@@ -253,16 +253,22 @@ void manager(int sockServer, int numChld)
 
     if (signal(SIGINT, signal_handler) == SIG_ERR)
     {
-        print_err("<%s:%d> Error signal(SIGINT): %s\n", __func__, __LINE__, strerror(errno));
+        print_err("[%d]<%s:%d> Error signal(SIGINT): %s\n", numChld, __func__, __LINE__, strerror(errno));
         exit(EXIT_FAILURE);
     }
     
     if (signal(SIGSEGV, signal_handler) == SIG_ERR)
     {
-        print_err("<%s:%d> Error signal(SIGSEGV): %s\n", __func__, __LINE__, strerror(errno));
+        print_err("[%d]<%s:%d> Error signal(SIGSEGV): %s\n", numChld, __func__, __LINE__, strerror(errno));
         exit(EXIT_FAILURE);
     }
-    //----------------------------------------
+    //------------------------------------------------------------------
+    if (chdir(conf->rootDir.c_str()))
+    {
+        print_err("[%d]<%s:%d> Error chdir(%s): %s\n", numChld, __func__, __LINE__, conf->rootDir.c_str(), strerror(errno));
+        exit(EXIT_FAILURE);
+    }
+    //------------------------------------------------------------------
     thread EventHandler;
     try
     {

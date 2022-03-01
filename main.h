@@ -304,7 +304,7 @@ void close_logs(void);
 void print_err(Connect *req, const char *format, ...);
 void print_log(Connect *req);
 //----------------------------------------------------------------------
-int timedwait_close_cgi(int numChld, int MaxChldsCgi);
+int timedwait_close_cgi(int MaxChldsCgi);
 void cgi_dec();
 //----------------------------------------------------------------------
 void end_response(Connect *req);

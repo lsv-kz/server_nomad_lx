@@ -6,7 +6,7 @@ mutex mtx_chld;
 condition_variable condCloseCGI;
 int num_cgi_chlds = 0;
 //======================================================================
-int timedwait_close_cgi(int numChld, int MaxChldsCgi)
+int timedwait_close_cgi(int MaxChldsCgi)
 {
     int ret = 0;
 unique_lock<mutex> lk(mtx_chld);
@@ -467,7 +467,7 @@ int cgi(Connect *req)
         }
     }
 
-    if (timedwait_close_cgi(req->numChld, conf->MaxChldsCgi))
+    if (timedwait_close_cgi(conf->MaxChldsCgi))
     {
         return -1;
     }
