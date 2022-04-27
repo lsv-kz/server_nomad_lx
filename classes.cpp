@@ -111,16 +111,14 @@
         return 0;
     }
 //======================================================================
-int ArrayRanges::check_ranges()
+void ArrayRanges::check_ranges()
 {
-    int numPart, maxIndex, n;
+    if (err) return;
     Range *r = range;
-    numPart = lenBuf;
-    maxIndex = n = numPart - 1;
 
-    while (n > 0)
+    for ( int n = Len - 1; n > 0; n--)
     {
-        for (int i = n - 1; i >= 0; )
+        for (int i = n - 1; i >= 0; i--)
         {
             if (((r[n].end + 1) >= r[i].start) && ((r[i].end + 1) >= r[n].start))
             {
@@ -133,147 +131,152 @@ int ArrayRanges::check_ranges()
                 r[i].part_len = r[i].end - r[i].start + 1;
                 r[n].part_len = 0;
 
-                if ((maxIndex > n) && (r[maxIndex].part_len > 0))
-                {
-                    r[n].start = r[maxIndex].start;
-                    r[n].end = r[maxIndex].end;
-                    r[n].part_len = r[maxIndex].part_len;
-                    r[maxIndex].part_len = 0;
-                    maxIndex--;
-                    n = maxIndex - 1;
-                }
-                else
-                {
-                    maxIndex--;
-                    n = maxIndex;
-                }
-                numPart--;
-                i = n - 1;
+                n--;
+                LenRanges--;
             }
-            else
-                i--;
         }
-        n--;
     }
-
-    return numPart;
+    
+    for (int i = 0, j = 0; j < Len; j++)
+    {
+        if (r[j].part_len)
+        {
+            if (i < j)
+            {
+                r[i].start = r[j].start;
+                r[i].end = r[j].end;
+                r[i].part_len = r[j].part_len;
+                r[j].part_len = 0;
+            }
+            
+            i++;
+        }
+    }
 }
 //----------------------------------------------------------------------
-int ArrayRanges::parse_ranges(char *sRange, String& ss)
+void ArrayRanges::parse_ranges(char *sRange)
 {
-    char *p0 = sRange, *p;
-
-    if (ss.error())
+    if (err) return;
+    long long start = 0, end = 0, size = sizeFile, ll;
+    int i = 0;
+    const char *p1;
+    char *p2;
+    
+    if (sRange == NULL)
     {
         err = 1;
-        return 0;
+        return;
     }
-    long long size = sizeFile;
-    int numPart = 0;
     
-    for (; *p0; p0++)
+    p1 = p2 = sRange;
+    
+    for ( ; Len <= (MaxRanges - 1); )
     {
-        if ((*p0 != ' ') && (*p0 != '\t'))
-            break;
-    }
-
-    for (p = p0; *p; )
-    {
-        long long start = 0, end = 0;
-        char ch = *p;
-        if ((ch >= '0') && (ch <= '9'))
+        if (err) return;
+        if ((*p1 >= '0') && (*p1 <= '9'))
         {
-            start = strtoll(p, &p, 10);
-            if (*p == '-')
+            ll = strtoll(p1, &p2, 10);
+            if (p1 < p2)
             {
-                ch = *(++p);
-                if ((ch >= '0') && (ch <= '9'))// [10-50]
-                {
-                    end = strtoll(p, &p, 10);
-                    if ((*p != ',') && (*p != 0))
-                        break;
-                }
-                else if ((ch == ',') || (ch == 0))// [10-]
-                    end = size - 1;
+                if (i == 0)
+                    start = ll;
+                else if (i == 2)
+                    end = ll;
                 else
-                    break;
-            }
-            else
-            {
-                return 0;
+                {
+                    err = 416;
+                    return;
+                }
+                            
+                i++;
+                p1 = p2;
             }
         }
-        else if (ch == '-')
+        else if (*p1 == ' ')
+            p1++;
+        else if (*p1 == '-')
         {
-            if ((*(p+1) >= '0') && (*(p+1) <= '9'))// [-50]
+            if (i == 0)
             {
-                end = strtoll(p, &p, 10);
-                if ((*p != ',') && (*p != 0))
-                    break;
-                start = size + end;
-                end = size - 1;
+                ll = strtoll(p1, &p2, 10);
+                if (ll < 0)
+                {
+                    start = size + ll;
+                    end = size - 1;
+                    i = 3;
+                    p1 = p2;
+                }
+                else
+                {
+                    err = 416;
+                    return;
+                }
+            }
+            else if (i == 2)
+            {
+                err = 416;
+                return;
             }
             else
             {
-                return 0;
+                p1++;
+                i++;
             }
+        }
+        else if (*p1 == ',')
+        {
+            if (i == 2)
+                end = size - 1;
+            else if (i != 3)
+            {
+                err = 416;
+                return;
+            }
+
+            if (end >= size)
+                end = size - 1;
+            
+            if (start <= end)
+                (*this) << Range{start, end, end - start + 1};
+            
+            start = end = 0;
+            p1++;
+            i = 0;
+        }
+        else if (*p1 == 0)
+        {
+            if (i == 2)
+                end = size - 1;
+            else if (i != 3)
+            {
+                err = 416;
+                return;
+            }
+
+            if (end >= size)
+                end = size - 1;
+            
+            if (start <= end)
+                (*this) << Range{start, end, end - start + 1};
+            
+            start = end = 0;
+            break;
         }
         else
         {
-            break;
+            err = 416;
+            return;
         }
-        
-        if (end >= size)
-            end = size - 1;
-        
-        if ((start < size) && (end >= start) && (start >= 0))
-        {
-            ss << start << "-" << end;
-            if (*p == ',')
-                ss << ",";
-            numPart++;
-            if (*p == 0)
-                break;
-        }
-        p++;
     }
-
-    return numPart;
 }
 //----------------------------------------------------------------------
-int ArrayRanges::get_ranges(char *s, long long sz)
+ArrayRanges::ArrayRanges(char *s, long long sz)
 {
-    String ss(128);
     sizeFile = sz;
-    numPart = parse_ranges(s, ss);
-    if (numPart > 0)
-    {
-        reserve(numPart);
-        if (err)
-        {
-            numPart = 0;
-            return 0;
-        }
-        
-        const char *p = ss.c_str();
-        char *pp;
-        for (int i = 0; i < numPart; ++i)
-        {
-            long long start, end;
-            start = strtoll(p, &pp, 10);
-            pp++;
-            p = pp;
-            
-            end = strtoll(p, &pp, 10);
-            pp++;
-            p = pp;
-            
-            (*this) << Range{start, end, end - start + 1};
-            if (err) return 0;
-        }
-        
-        if (numPart > 1)
-            numPart = check_ranges();
-    }
-    return numPart;
+    parse_ranges(s);
+    LenRanges = Len;
+    if ((Len == 0) && (err == 0))
+        err = 416;
+    else if (Len > 1)
+        check_ranges();
 }

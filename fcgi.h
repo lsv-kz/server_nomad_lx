@@ -367,7 +367,6 @@ public://===============================================================
                 int n = fcgi_read(padd, header.len);
                 if (n > 0)
                 {
-                    fprintf(stderr, "\n");
                     header.len -= n;
                 }
                 

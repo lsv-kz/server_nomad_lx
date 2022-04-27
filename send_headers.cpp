@@ -4,7 +4,7 @@ using namespace std;
 
 const char *status_resp(int st);
 //======================================================================
-int send_response_headers(Connect *req, String *hdrs)
+int send_response_headers(Connect *req, const String *hdrs)
 {
     if(req->httpProt == HTTP09)
     {
@@ -28,7 +28,10 @@ int send_response_headers(Connect *req, String *hdrs)
     if(req->reqMethod == M_OPTIONS)
         resp << "Allow: OPTIONS, GET, HEAD, POST\r\n";
     else
-        resp << "Accept-Ranges: bytes\r\n";
+    {
+        if (req->resp.respStatus == RS200)
+            resp << "Accept-Ranges: bytes\r\n";
+    }
 
     if (req->resp.numPart == 1)
     {
@@ -45,6 +48,8 @@ int send_response_headers(Connect *req, String *hdrs)
             resp << "Content-Type: " << req->resp.respContentType << "\r\n";
         if(req->resp.respContentLength >= 0)
             resp << "Content-Length: " << req->resp.respContentLength << "\r\n";
+        if (req->resp.respStatus == RS416)
+            resp << "Content-Range: bytes */" << req->resp.fileSize << "\r\n";
     }
 
     if(req->resp.respStatus == RS101)
@@ -60,10 +65,7 @@ int send_response_headers(Connect *req, String *hdrs)
         resp << hdrs->c_str();
     }
 
-    if(req->resp.numPart  > 1)
-        resp << "\r\n\r\n";
-    else
-        resp << "\r\n";
+    resp << "\r\n";
 
     if (resp.error())
     {
@@ -85,9 +87,10 @@ int send_response_headers(Connect *req, String *hdrs)
     return 0;
 }
 //======================================================================
-void send_message(Connect *req, const char *msg, String *hdrs)
+void send_message(Connect *req, const char *msg, const String *hdrs)
 {
-    if(!msg) msg = "";
+    if (!msg)
+        msg = "";
     String html(256);
 
     if (req->resp.respStatus != RS204)

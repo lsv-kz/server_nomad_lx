@@ -277,8 +277,8 @@ int fcgi_read_stderr(int fd, int cont_len, int timeout);
 int send_largefile(Connect *req, char *buf, int size, off_t offset, long long *cont_len);
 //----------------------------------------------------------------------
 void get_time_run(int a, int b, struct timeval *time1, struct timeval *time2);
-void send_message(Connect *req, const char *msg, String *);
-int send_response_headers(Connect *req, String *hdrs);
+void send_message(Connect *req, const char *msg, const String *);
+int send_response_headers(Connect *req, const String *hdrs);
 //----------------------------------------------------------------------
 String get_time();
 void get_time(String& s);

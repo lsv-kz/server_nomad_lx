@@ -90,66 +90,53 @@ int decode(const char *s_in, int len_in, char *s_out, int len)
 {
     if (!s_in || !s_out)
         return -1;
-    char *p = s_out;
     char tmp[3];
-    char hex[] = "0123456789ABCDEFabcdef";
+    char *p = s_out;
     unsigned char c;
-    int cnt = 0, i;
+    long cnt = 0, i;
 
-    while(len >= 1)
+    while (len_in > 0)
     {
         c = *(s_in++);
-        cnt++;
-        if(c == '%')
-        {
-            if (!strchr(hex, *s_in))
-            {
-                *p++ = c;
-                len--;
-            }
-            else
-            {
-                tmp[0] = *(s_in++);
-                --len_in;
-                
-                if (!len_in)
-                    break;
-                
-                tmp[1] = *(s_in++);
-                --len_in;
-                if (!len_in)
-                    break;
-                
-                tmp[2] = 0;
-                
-                if(strspn(tmp, hex) != 2)
-                {
-                    *s_out = 0;
-                    return -1;
-                }
-                
-                sscanf(tmp, "%x", &i);
-                *p++ = (char)i;
-                len--;
-            }
-        }
-        else if(c == '+')
-        {
-            *p++ = ' ';
-            len--;
-        }
-        else
-        {
-            *p++ = c;
-            len--;
-        }
-        
         --len_in;
-        if (!len_in)
-            break;
+        if (c == '%')
+        {
+            if (len_in < 2)
+            {
+                *p = 0;
+                return 0;
+            }
+            
+            tmp[0] = *(s_in++);
+            tmp[1] = *(s_in++);
+            tmp[2] = 0;
+            len_in -= 2;
+
+            const char* pp = tmp;
+            i = strtol((char*)pp, (char**)&pp, 16);
+            if (*pp != 0)
+            {
+                *p = 0;
+                return 0;
+            }
+                
+            *p = (char)i;
+        }
+        else if (c == '+')
+            *p = ' ';
+        else
+            *p = c;
+
+        --len;
+         ++cnt;
+        if (len <= 0)
+        {
+            *p = 0;
+            return 0;
+        }
+        ++p;
     }
 
     *p = 0;
-    
     return cnt;
 }

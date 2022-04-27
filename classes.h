@@ -15,67 +15,79 @@ class ArrayRanges
 protected:
     const int ADDITION = 8;
     Range *range = NULL;
-    unsigned int sizeBuf = 0;
-    unsigned int lenBuf = 0;
-    int numPart;
+    int SizeArray = 0;
+    int Len = 0, LenRanges = 0, MaxRanges = 20;
     long long sizeFile;
     int err = 0;
-    
-    int check_ranges();
-    int parse_ranges(char *sRange, String& ss);
+    void check_ranges();
+    void parse_ranges(char *sRange);
     
 public:
     ArrayRanges(const ArrayRanges&) = delete;
-    ArrayRanges() { }
+    ArrayRanges() = delete;
+    ArrayRanges(char *s, long long sz);
     ~ArrayRanges() { if (range) { delete [] range; } }
     
-    void reserve(unsigned int n)
+    void reserve(int n)
     {
-        if (n <= lenBuf)
+        if (n <= 0)
         {
             err = 1;
             return;
         }
+        
+        if (err) return;
+        if (n <= Len)
+        {
+            err = 1;
+            return;
+        }
+        
         Range *tmp = new(std::nothrow) Range [n];
         if (!tmp)
         {
-            err = ENOMEM;
+            err = 1;
             return;
         }
-        for (unsigned int i = 0; i < lenBuf; ++i)
+        
+        for (int i = 0; i < Len; ++i)
             tmp[i] = range[i];
         if (range)
             delete [] range;
         range = tmp;
-        sizeBuf = n;
+        SizeArray = n;
     }
 
     ArrayRanges & operator << (const Range& val)
     {
         if (err) return *this;
-        if (lenBuf >= sizeBuf)
+        if (Len >= SizeArray)
         {
-            reserve(sizeBuf + ADDITION);
+            reserve(SizeArray + ADDITION);
             if (err) return *this;
         }
-        range[lenBuf++] = val;
+        range[Len++] = val;
         return *this;
     }
     
-    Range *get(unsigned int i)
+    Range *get(int i)
     {
+        if (i < 0)
+        {
+            err = 1;
+            return NULL;
+        }
+        
         if (err) return NULL;
-        if (i < lenBuf)
+        if (i < Len)
             return range + i;
         else
             return NULL;
     }
     
-    int len() { if (err) return 0; return lenBuf; }
-    int capacity() { if (err) return 0; return sizeBuf; }
-    int error() { return err; }
-    
-    int get_ranges(char *s, long long sz);
+    int size() { if (err) return 0; return LenRanges; }
+    int capacity() { if (err) return 0; return SizeArray; }
+    int error() { return -err; }
 };
 //======================================================================
 const int CHUNK_SIZE_BUF = 4096;
