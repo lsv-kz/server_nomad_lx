@@ -139,7 +139,7 @@ void response1(RequestManager *ReqMan)
 }
 //======================================================================
 int send_file(Connect *req);
-int send_multy_part(Connect *req, ArrayRanges& rg, char *rd_buf, int size);
+int send_multypart(Connect *req, ArrayRanges& rg, char *rd_buf, int size);
 int create_multipart_head(Connect *req, Range *ranges, char *buf, int len_buf);
 const char boundary[] = "---------a9b5r7a4c0a2d5a1b8r3a";
 //======================================================================
@@ -202,7 +202,7 @@ int response2(Connect *req)
             print_err(req, "<%s:%d> script (%s) not found\n", __func__, __LINE__, req->decodeUri);
             return -RS404;
         }
-
+        
         req->resp.scriptName = req->decodeUri;
 
         if (conf->UsePHP == "php-fpm")
@@ -288,7 +288,7 @@ int response2(Connect *req)
         }
         //--------------------------------------------------------------
         int len = path.size();
-        path << "/index.html";
+        path << "/index.html";// line: 249
         if ((stat(path.c_str(), &st) != 0) || (conf->index_html != 'y'))
         {
             errno = 0;
@@ -297,13 +297,13 @@ int response2(Connect *req)
             int ret;
             if ((conf->UsePHP != "n") && (conf->index_php == 'y'))
             {
-                path << "/index.php";
+                path << "/index.php";// line: 249
                 if (!stat(path.c_str(), &st))
                 {
                     String s = req->decodeUri;
                     s << "index.php";
                     req->resp.scriptName = s.c_str();
-
+                    
                     if (conf->UsePHP == "php-fpm")
                     {
                         req->resp.scriptType = php_fpm;
@@ -343,21 +343,19 @@ int response2(Connect *req)
             }
 
             path.reserve(path.capacity() + 256);
-            return index_dir(req, path);
+            if (conf->AutoIndex == 'y')
+                return index_dir(req, path);
+            else
+                return -RS403;
         }
     }
-    //------------------------------------------------------------------
+    
+    if (req->reqMethod == M_POST)
+        return -RS405;
+    //--------------------- send file ----------------------------------
     req->resp.fileSize = file_size(path.c_str());
     req->resp.numPart = 0;
     req->resp.respContentType = content_type(path.c_str());
-    //------------------------------------------------------------------
-    if (req->reqMethod == M_HEAD)
-    {
-        if (send_response_headers(req, NULL))
-            return -1;
-        
-        return 0;
-    }
     //------------------------------------------------------------------
     req->resp.fd = open(path.c_str(), O_RDONLY);
     if (req->resp.fd == -1)
@@ -384,9 +382,6 @@ int send_file(Connect *req)
 {
     if (req->req_hdrs.iRange >= 0)
     {
-        if (!req->sRange)
-            return -RS416;
-        
         int err;
         
         ArrayRanges rg(req->sRange, req->resp.fileSize);
@@ -397,11 +392,10 @@ int send_file(Connect *req)
         }
         
         req->resp.numPart = rg.size();
+        req->resp.respStatus = RS206;
         if (req->resp.numPart > 1)
         {
-            req->resp.respStatus = RS206;
-            
-            int size = conf->SNDBUF_SIZE; // 8192
+            int size = conf->SNDBUF_SIZE;
             char *rd_buf = new(nothrow) char [size];
             if (!rd_buf)
             {
@@ -409,19 +403,26 @@ int send_file(Connect *req)
                 return -1;
             }
 
-            int n = send_multy_part(req, rg, rd_buf, size);
+            int n = send_multypart(req, rg, rd_buf, size);
             delete [] rd_buf;
             return n;
         }
         else if (req->resp.numPart == 1)
         {
-            req->resp.respStatus = RS206;
             Range *pr = rg.get(0);
             if (pr)
             {
                 req->resp.offset = pr->start;
-                req->resp.respContentLength = pr->part_len;
+                req->resp.respContentLength = pr->len;
+                if (req->reqMethod == M_HEAD)
+                {
+                    if (send_response_headers(req, NULL))
+                        return -1;
+                    return 0;
+                }
             }
+            else
+                return -RS500;
         }
         else
         {
@@ -435,6 +436,12 @@ int send_file(Connect *req)
         req->resp.respStatus = RS200;
         req->resp.offset = 0;
         req->resp.respContentLength = req->resp.fileSize;
+        if (req->reqMethod == M_HEAD)
+        {
+            if (send_response_headers(req, NULL))
+                return -1;
+            return 0;
+        }
     }
     
     if (send_response_headers(req, NULL))
@@ -445,7 +452,7 @@ int send_file(Connect *req)
     return 1;
 }
 //======================================================================
-int send_multy_part(Connect *req, ArrayRanges& rg, char *rd_buf, int size)
+int send_multypart(Connect *req, ArrayRanges& rg, char *rd_buf, int size)
 {
     int n;
     long long send_all_bytes = 0;
@@ -454,7 +461,7 @@ int send_multy_part(Connect *req, ArrayRanges& rg, char *rd_buf, int size)
     
     for (int i = 0; (range = rg.get(i)) && (i < req->resp.numPart); ++i)
     {
-        send_all_bytes += (range->part_len);
+        send_all_bytes += (range->len);
         send_all_bytes += create_multipart_head(req, range, buf, sizeof(buf));
     }
     send_all_bytes += snprintf(buf, sizeof(buf), "\r\n--%s--\r\n", boundary);
@@ -470,9 +477,9 @@ int send_multy_part(Connect *req, ArrayRanges& rg, char *rd_buf, int size)
     }
     
     if (send_response_headers(req, &hdrs))
-    {
         return -1;
-    }
+    if (req->reqMethod == M_HEAD)
+        return 0;
     
     send_all_bytes = 0;
     
@@ -492,9 +499,9 @@ int send_multy_part(Connect *req, ArrayRanges& rg, char *rd_buf, int size)
         }
         
         send_all_bytes += n;
-        send_all_bytes += range->part_len;
+        send_all_bytes += range->len;
 
-        if (send_largefile(req, rd_buf, size, range->start, &range->part_len))
+        if (send_largefile(req, rd_buf, size, range->start, &range->len))
         {
             print_err(req, "<%s:%d> Error: send_file_ux()\n", __func__, __LINE__);
             return -1;

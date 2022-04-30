@@ -159,7 +159,7 @@ int cgi_chunk(Connect *req, String *hdrs, int cgi_serv_in, pid_t pid, char *tail
 int cgi_read_headers(Connect *req, int cgi_serv_in, pid_t pid)
 {
     req->resp.respStatus = RS200;
-
+    
     String hdrs(256);
     if (hdrs.error())
     {
@@ -467,7 +467,7 @@ int cgi(Connect *req)
         }
     }
 
-    if (timedwait_close_cgi(conf->MaxChldsCgi))
+    if (timedwait_close_cgi(conf->MaxCgiProc))
     {
         return -1;
     }

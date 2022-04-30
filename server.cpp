@@ -61,17 +61,18 @@ int main(int argc, char *argv[])
          << "\n   SendFile = " << conf->SEND_FILE
          << "\n   MaxRequests = " << conf->MAX_REQUESTS
          
-         << "\n\n   NumChld = " << conf->NumChld
+         << "\n\n   NumProc = " << conf->NumProc
          << "\n   MaxThreads = " << conf->MaxThreads
          << "\n   MimThreads = " << conf->MinThreads
          << "\n   MaxRequestsPerThr = " << conf->MaxRequestsPerThr
-         << "\n   MaxChldsCgi = " << conf->MaxChldsCgi
+         << "\n   MaxCgiProc = " << conf->MaxCgiProc
          
          << "\n\n   KeepAlive " << conf->KeepAlive
          << "\n   TimeoutPoll = " << conf->TIMEOUT_POLL
          << "\n   TimeoutKeepAlive = " << conf->TimeoutKeepAlive
          << "\n   TimeOut = " << conf->TimeOut
          << "\n   TimeoutCGI = " << conf->TimeoutCGI
+         << "\n   MaxRanges = " << conf->MaxRanges
          << "\n\n   UsePHP: " << conf->UsePHP.c_str()
          << "\n   PathPHP: " << conf->PathPHP.c_str()
          << "\n   root_dir = " << conf->rootDir.c_str()
@@ -98,17 +99,17 @@ int main(int argc, char *argv[])
     Connect::serverSocket = sockServer;
     
     pid_t pid_child;
-    int numChld = 0;
-    while (numChld < conf->NumChld)
+    int numProc = 0;
+    while (numProc < conf->NumProc)
     {
-        pid_child = create_child(numChld);
+        pid_child = create_child(numProc);
         if (pid_child < 0)
         {
-            print_err("<%s:%d> Error create_child() %d \n", __func__, __LINE__, numChld);
+            print_err("<%s:%d> Error create_child() %d \n", __func__, __LINE__, numProc);
             exit(3);
         }
 
-        ++numChld;
+        ++numProc;
     }
 
     if (signal(SIGINT, signal_handler) == SIG_ERR)

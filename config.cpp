@@ -63,17 +63,19 @@ void create_conf_file(const char *path)
     fconf << "SendFile  " << c.SEND_FILE << "\n";
     fconf << "TimeoutPoll  " << c.TIMEOUT_POLL << "\n\n";
     
-    fconf << "NumChld " << c.NumChld << "\n";
+    fconf << "NumProc " << c.NumProc << "\n";
     fconf << "MaxThreads " << c.MaxThreads << "\n";
     fconf << "MinThreads " << c.MinThreads << "\n\n";
     
-    fconf << "MaxChldsCgi " << c.MaxChldsCgi << "\n\n";
+    fconf << "MaxCgiProc " << c.MaxCgiProc << "\n\n";
 
     fconf << "KeepAlive  " << c.KeepAlive << " #   y/n" << "\n";
     fconf << "TimeoutKeepAlive " << c.TimeoutKeepAlive << "\n";
     fconf << "TimeOut    " << c.TimeOut << "\n";
     fconf << "TimeoutCGI " << c.TimeoutCGI << "\n\n";
-
+    
+    fconf << "MaxRanges  %d\n\n" << c.MaxRanges << "\n\n";
+    
     fconf << "ClientMaxBodySize " << c.ClientMaxBodySize << "\n\n";
     
     fconf << " UsePHP     n  # php-fpm # php-cgi \n";
@@ -184,14 +186,14 @@ void read_conf_file(const char *path_conf)
             ss >> c.SNDBUF_SIZE;
         else if (s == "MaxRequests")
             ss >> c.MAX_REQUESTS;
-        else if (s == "NumChld")
-            ss >> c.NumChld;
+        else if (s == "NumProc")
+            ss >> c.NumProc;
         else if (s == "MaxThreads")
             ss >> c.MaxThreads;
         else if (s == "MinThreads")
             ss >> c.MinThreads;
-        else if (s == "MaxChldsCgi")
-            ss >> c.MaxChldsCgi;
+        else if (s == "MaxCgiProc")
+            ss >> c.MaxCgiProc;
         else if (s == "KeepAlive")
             ss >> c.KeepAlive;
         else if (s == "TimeoutKeepAlive")
@@ -200,6 +202,8 @@ void read_conf_file(const char *path_conf)
             ss >> c.TimeOut;
         else if (s == "TimeoutCGI")
             ss >> c.TimeoutCGI;
+        else if (s == "MaxRanges")
+            ss >> c.MaxRanges;
         else if (s == "UsePHP")
             ss >> c.UsePHP;
         else if (s == "PathPHP")
@@ -313,9 +317,9 @@ void read_conf_file(const char *path_conf)
         fprintf(stderr, "!!! Error ScriptPath [%s]\n", c.cgiDir.c_str());
     }
     
-    if ((c.NumChld < 1) || (c.NumChld > 8))
+    if ((c.NumProc < 1) || (c.NumProc > 8))
     {
-        print_err("<%s:%d> Error: Number of Processes = %d; [1 < NumChld <= 6]\n", __func__, __LINE__, c.NumChld);
+        print_err("<%s:%d> Error: Number of Processes = %d; [1 < NumChld <= 6]\n", __func__, __LINE__, c.NumProc);
         exit(1);
     }
     

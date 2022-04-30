@@ -26,7 +26,7 @@ void get_time(String& str)
     strftime(s, sizeof(s), "%a, %d %b %Y %H:%M:%S GMT", &t);
     str = s;
 }
-/*====================================================================*/
+//======================================================================
 const char *strstr_case(const char *s1, const char *s2)
 {
     const char *p1, *p2;
@@ -427,7 +427,7 @@ end:
 
     return "";
 }
-/*====================================================================*/
+//======================================================================
 int clean_path(char *path)
 {
     int i = 0, o = 0;
@@ -554,7 +554,7 @@ int parse_startline_request(Connect *req, char *s, int len)
 
     return 0;
 }
-/*====================================================================*/
+//======================================================================
 int parse_headers(Connect *req, char *s, int len)
 {
     if (req->req_hdrs.countReqHeaders >= MAX_HEADERS)
@@ -633,7 +633,7 @@ int parse_headers(Connect *req, char *s, int len)
 
     return 0;
 }
-/*====================================================================*/
+//======================================================================
 const char *str_err(int i)
 {
     switch(i)
@@ -751,28 +751,4 @@ const char *str_err(int i)
             return "?";
     }
     return "";
-}
-//======================================================================
-void hex_dump_stderr(const char *s, int line, const void *p, int n)
-{
-    int count, addr = 0, col;
-    unsigned char *buf = (unsigned char*)p;
-    char str[18];
-    cerr << "<" << s << ":" << line << ">--- HEX ---\n";
-    for(count = 0; count < n;)
-    {
-        cerr << uppercase << fixed << right << setw(8) << setfill('0') << hex << addr << "  "; 
-        for(col = 0, addr = addr + 0x10; (count < n) && (col < 16); count++, col++)
-        {
-            if (col == 8) cerr << ' ';
-            cerr << uppercase << fixed << right << setw(2) << setfill('0') << hex << (int)*(buf+count) << " "; 
-            str[col] = (*(buf + count) >= 32 && *(buf + count) < 127) ? *(buf + count) : '.';
-        }
-
-        str[col] = 0;
-        if (col <= 8) cerr << ' ';
-        cerr << "  " << setfill(' ') << setw(((16 - (col))) * 3) << ""  << str << "\n"; 
-    }
-    
-    cerr << dec << "----------------------------------------------\n";
 }

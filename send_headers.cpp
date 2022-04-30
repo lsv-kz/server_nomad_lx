@@ -27,27 +27,28 @@ int send_response_headers(Connect *req, const String *hdrs)
 
     if(req->reqMethod == M_OPTIONS)
         resp << "Allow: OPTIONS, GET, HEAD, POST\r\n";
-    else
-    {
-        if (req->resp.respStatus == RS200)
-            resp << "Accept-Ranges: bytes\r\n";
-    }
 
     if (req->resp.numPart == 1)
     {
-        resp << "Content-Range: bytes " << req->resp.offset << "-" 
-                                        << (req->resp.offset + req->resp.respContentLength - 1) 
-                                        << "/" << req->resp.fileSize << "\r\n";
         if (req->resp.respContentType)
             resp << "Content-Type: " << req->resp.respContentType << "\r\n";
         resp << "Content-Length: " << req->resp.respContentLength << "\r\n";
+        
+        resp << "Content-Range: bytes " << req->resp.offset << "-" 
+                                        << (req->resp.offset + req->resp.respContentLength - 1) 
+                                        << "/" << req->resp.fileSize << "\r\n";
     }
     else if (req->resp.numPart == 0)
     {
         if (req->resp.respContentType)
             resp << "Content-Type: " << req->resp.respContentType << "\r\n";
         if(req->resp.respContentLength >= 0)
+        {
             resp << "Content-Length: " << req->resp.respContentLength << "\r\n";
+            if (req->resp.respStatus == RS200)
+                resp << "Accept-Ranges: bytes\r\n";
+        }
+        
         if (req->resp.respStatus == RS416)
             resp << "Content-Range: bytes */" << req->resp.fileSize << "\r\n";
     }
@@ -179,8 +180,6 @@ const char *status_resp(int st)
             return "414 Request-URI Too Large";
         case RS416:
             return "416 Range Not Satisfiable";
-        case RS418:
-            return "418 I'm a teapot";
         case RS500:
             return "500 Internal Server Error";
         case RS501:

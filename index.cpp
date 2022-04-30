@@ -88,22 +88,22 @@ int index_chunked(Connect *req, char **list, int numFiles, String& path)
         }
     }
     //------------------------------------------------------------------
-    chunk_buf << "<!DOCTYPE HTML>\n"
-            "<html>\n"
-            " <head>\n"
-            "  <meta charset=\"UTF-8\">\n"
-            "  <title>Index of " << req->decodeUri << " (ch)</title>\n"
-            "  <style>\n"
-            "    body {\n"
-            "     margin-left:100px; margin-right:50px;\n"
-            "    }\n"
-            "  </style>\n"
-            "  <link href=\"/styles.css\" type=\"text/css\" rel=\"stylesheet\">"
-            " </head>\n"
-            " <body id=\"top\">\n"
-            "  <h3>Index of " << req->decodeUri << "</h3>\n"
-            "  <table cols=\"2\" width=\"100\%\">\n"
-            "   <tr><td><h3>Directories</h3></td><td></td></tr>\n";
+    chunk_buf << "<!DOCTYPE HTML>\r\n"
+            "<html>\r\n"
+            " <head>\r\n"
+            "  <meta charset=\"UTF-8\">\r\n"
+            "  <title>Index of " << req->decodeUri << " (ch)</title>\r\n"
+            "  <style>\r\n"
+            "    body {\r\n"
+            "     margin-left:100px; margin-right:50px;\r\n"
+            "    }\r\n"
+            "  </style>\r\n"
+            "  <link href=\"/styles.css\" type=\"text/css\" rel=\"stylesheet\">\r\n"
+            " </head>\r\n"
+            " <body id=\"top\">\r\n"
+            "  <h3>Index of " << req->decodeUri << "</h3>\r\n"
+            "  <table cols=\"2\" width=\"100\%\">\r\n"
+            "   <tr><td><h3>Directories</h3></td><td></td></tr>\r\n";
     if (chunk_buf.error())
     {
         print_err("<%s:%d>   Error chunk\n", __func__, __LINE__);
@@ -111,9 +111,9 @@ int index_chunked(Connect *req, char **list, int numFiles, String& path)
     }
     //------------------------------------------------------------------
     if(!strcmp(req->decodeUri, "/"))
-        chunk_buf << "   <tr><td></td><td></td></tr>\n";
+        chunk_buf << "   <tr><td></td><td></td></tr>\r\n";
     else
-        chunk_buf << "   <tr><td><a href=\"../\">Parent Directory/</a></td><td></td></tr>\n";
+        chunk_buf << "   <tr><td><a href=\"../\">Parent Directory/</a></td><td></td></tr>\r\n";
     if (chunk_buf.error())
     {
         print_err(req, "<%s:%d>   Error chunk\n", __func__, __LINE__);
@@ -135,7 +135,7 @@ int index_chunked(Connect *req, char **list, int numFiles, String& path)
             continue;
         }
 
-        chunk_buf << "   <tr><td><a href=\"" << buf << "/\">" << list[i] << "/</a></td><td align=right></td></tr>\n";
+        chunk_buf << "   <tr><td><a href=\"" << buf << "/\">" << list[i] << "/</a></td><td align=right></td></tr>\r\n";
         if (chunk_buf.error())
         {
             print_err(req, "<%s:%d>   Error chunk\n", __func__, __LINE__);
@@ -143,8 +143,8 @@ int index_chunked(Connect *req, char **list, int numFiles, String& path)
         }
     }
     //------------------------------------------------------------------
-    chunk_buf << "   <tr><td><hr></td><td><hr></td></tr>\n"
-                "   <tr><td><h3>Files</h3></td><td></td></tr>\n";
+    chunk_buf << "   <tr><td><hr></td><td><hr></td></tr>\r\n"
+                "   <tr><td><h3>Files</h3></td><td></td></tr>\r\n";
     if (chunk_buf.error())
     {
         print_err(req, "<%s:%d>   Error chunk\n", __func__, __LINE__);
@@ -172,17 +172,17 @@ int index_chunked(Connect *req, char **list, int numFiles, String& path)
         {
             if(size < 15000LL)
                 chunk_buf << "   <tr><td><a href=\"" << buf << "\"><img src=\"" << buf << "\"></a><br>"
-                        << list[i] << "</td><td align=\"right\">" << size << " bytes</td></tr>\n   <tr><td></td><td></td></tr>\n";
+                        << list[i] << "</td><td align=\"right\">" << size << " bytes</td></tr>\r\n   <tr><td></td><td></td></tr>\r\n";
             else
                 chunk_buf << "   <tr><td><a href=\"" << buf << "\"><img src=\"" << buf << "\" width=\"300\"></a><br>"
-                        << list[i] << "</td><td align=\"right\">" << size << " bytes</td></tr>\n   <tr><td></td><td></td></tr>\n";
+                        << list[i] << "</td><td align=\"right\">" << size << " bytes</td></tr>\r\n   <tr><td></td><td></td></tr>\r\n";
         }
         else if(isaudiofile(list[i]) && (conf->ShowMediaFiles == 'y'))
-            chunk_buf << "   <tr><td><audio preload=\"none\" controls src=\"" << buf << "\"></audio><a href=\""
-                    << buf << "\">" << list[i] << "</a></td><td align=\"right\">" << size << " bytes</td></tr>\n";
+            chunk_buf << "   <tr><td><audio preload=\"auto\" controls src=\"" << buf << "\"></audio><a href=\""
+                    << buf << "\">" << list[i] << "</a></td><td align=\"right\">" << size << " bytes</td></tr>\r\n";
         else
             chunk_buf << "   <tr><td><a href=\"" << buf << "\">" << list[i] << "</a></td><td align=\"right\">" 
-                    << size << " bytes</td></tr>\n";
+                    << size << " bytes</td></tr>\r\n";
         
         if (chunk_buf.error())
         {
@@ -191,22 +191,22 @@ int index_chunked(Connect *req, char **list, int numFiles, String& path)
         }
     }
     //------------------------------------------------------------------
-    chunk_buf << "  </table>\n"
-              "  <hr>\n"
-              "  " << req->resp.sLogTime << "\n"
-              "  <a href=\"#top\" style=\"display:block;\n"
-              "         position:fixed;\n"
-              "         bottom:30px;\n"
-              "         left:10px;\n"
-              "         width:50px;\n"
-              "         height:40px;\n"
-              "         font-size:60px;\n"
-              "         background:gray;\n"
-              "         border-radius:10px;\n"
-              "         color:black;\n"
-              "         opacity: 0.7\">^</a>\n"
-              " </body>\n"
-              "</html>";
+    chunk_buf << "  </table>\r\n"
+              "  <hr>\r\n"
+              "  " << req->resp.sLogTime << "\r\n"
+              "  <a href=\"#top\" style=\"display:block;\r\n"
+              "         position:fixed;\r\n"
+              "         bottom:30px;\r\n"
+              "         left:10px;\r\n"
+              "         width:50px;\r\n"
+              "         height:40px;\r\n"
+              "         font-size:60px;\r\n"
+              "         background:gray;\r\n"
+              "         border-radius:10px;\r\n"
+              "         color:black;\r\n"
+              "         opacity: 0.7\">^</a>\r\n"
+              " </body>\r\n"
+              "</html>\r\n";
     if (chunk_buf.error())
     {
         print_err(req, "<%s:%d>   Error chunk\n", __func__, __LINE__);
@@ -214,9 +214,10 @@ int index_chunked(Connect *req, char **list, int numFiles, String& path)
     }
     //------------------------------------------------------------------
     n = chunk_buf.end();
-    req->resp.respContentLength = chunk_buf.len_entity();
+    req->resp.respContentLength = chunk_buf.all();
     if (n < 0)
     {
+        req->resp.send_bytes = chunk_buf.all();
         print_err(req, "<%s:%d>   Error chunk_buf.end(): %d\n", __func__, __LINE__, n);
         return -1;
     }
@@ -237,6 +238,9 @@ int index_chunked(Connect *req, char **list, int numFiles, String& path)
 //======================================================================
 int index_dir(Connect *req, String& path)
 {
+    if (req->reqMethod == M_POST)
+        return -RS405; // 403
+    
     DIR *dir;
     struct dirent *dirbuf;
     int maxNumFiles = 1024, numFiles = 0;

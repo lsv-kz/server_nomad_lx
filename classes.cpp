@@ -19,6 +19,7 @@
         
         req_hdrs = {-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1LL,0};
         
+        resp.fd = -1;
         resp.respStatus = 0;
         resp.respContentType = NULL;
         
@@ -128,8 +129,8 @@ void ArrayRanges::check_ranges()
                 if (r[n].end > r[i].end)
                     r[i].end = r[n].end;
 
-                r[i].part_len = r[i].end - r[i].start + 1;
-                r[n].part_len = 0;
+                r[i].len = r[i].end - r[i].start + 1;
+                r[n].len = 0;
 
                 n--;
                 LenRanges--;
@@ -139,14 +140,14 @@ void ArrayRanges::check_ranges()
     
     for (int i = 0, j = 0; j < Len; j++)
     {
-        if (r[j].part_len)
+        if (r[j].len)
         {
             if (i < j)
             {
                 r[i].start = r[j].start;
                 r[i].end = r[j].end;
-                r[i].part_len = r[j].part_len;
-                r[j].part_len = 0;
+                r[i].len = r[j].len;
+                r[j].len = 0;
             }
             
             i++;
@@ -170,7 +171,7 @@ void ArrayRanges::parse_ranges(char *sRange)
     
     p1 = p2 = sRange;
     
-    for ( ; Len <= (MaxRanges - 1); )
+    for ( ; Len < SizeArray; )
     {
         if (err) return;
         if ((*p1 >= '0') && (*p1 <= '9'))
@@ -232,7 +233,7 @@ void ArrayRanges::parse_ranges(char *sRange)
                 err = 416;
                 return;
             }
-
+            
             if (end >= size)
                 end = size - 1;
             
@@ -252,7 +253,7 @@ void ArrayRanges::parse_ranges(char *sRange)
                 err = 416;
                 return;
             }
-
+            
             if (end >= size)
                 end = size - 1;
             
@@ -272,11 +273,34 @@ void ArrayRanges::parse_ranges(char *sRange)
 //----------------------------------------------------------------------
 ArrayRanges::ArrayRanges(char *s, long long sz)
 {
+    if (!s)
+    {
+        err = RS500;
+        return;
+    }
+    
+    if (conf->MaxRanges == 0)
+    {
+        err = RS403;
+        return;
+    }
+
+    for ( char *p = s; *p; ++p)
+    {
+        if (*p == ',')
+            SizeArray++;
+    }
+    
+    SizeArray++;
+    
+    if (SizeArray > conf->MaxRanges)
+        SizeArray = conf->MaxRanges;
+    reserve();
     sizeFile = sz;
     parse_ranges(s);
     LenRanges = Len;
     if ((Len == 0) && (err == 0))
         err = 416;
-    else if (Len > 1)
-        check_ranges();
+    //else if (Len > 1)
+    //    check_ranges();
 }

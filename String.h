@@ -47,8 +47,8 @@ protected:
         memcpy(ptr + lenBuf, &ch, len);
         lenBuf += len;
     }
-    
-    void append(const char * s)
+    //[[gnu::noinline]]
+    void append(const char *s)
     {
         if (!s || err) return;
         unsigned long len = strlen(s);
@@ -221,15 +221,15 @@ public:
     String & operator << (T t)
     {
         if (err) return *this;
-        const unsigned long size = 21;
-        char s[size];
+        const unsigned long size_ = 21;
+        char s[size_];
         int cnt, minus = 0;
         const char *byte_to_char = "FEDCBA9876543210123456789ABCDEF";
         if (base_ == 16)
             cnt = sizeof(t)*2;
         else
         {
-            cnt = size - 1;
+            cnt = size_ - 1;
             if (t < 0) minus = 1;
         }
         s[cnt] = 0;
@@ -288,7 +288,7 @@ public:
     unsigned int size() const { if (err) return 0; return lenBuf; }
     unsigned int capacity() const { return sizeBuf; }
     void resize(unsigned int n) { if (err || (n > lenBuf)) return; lenBuf = n; }
-    //----------------------------- >> ---------------------------------
+    //------------------------------------------------------------------
     String & operator >> (String & s)
     {
         if (err || (this == &s))
@@ -350,7 +350,7 @@ public:
 
         return *this;
     }
-    //--------------------------- == -----------------------------------
+    //------------------------------------------------------------------
     friend const bool operator == (const String & s1, const String & s2)
     {
         if (s1.lenBuf != s2.lenBuf)
@@ -361,7 +361,7 @@ public:
         else
             return true;
     }
-    
+    //------------------------------------------------------------------
     friend bool operator == (const String & s1, const char *s2)
     {
         unsigned int len = strlen(s2);
@@ -373,7 +373,7 @@ public:
         else
             return true;
     }
-    
+    //------------------------------------------------------------------
     friend bool operator == (const char *s1, const String & s2)
     {
         unsigned int len = strlen(s1);
@@ -385,7 +385,7 @@ public:
         else
             return true;
     }
-    //---------------------------- != ----------------------------------
+    //------------------------------------------------------------------
     friend bool operator != (const String & s1, const char *s2)
     {
         unsigned long len = strlen(s2);

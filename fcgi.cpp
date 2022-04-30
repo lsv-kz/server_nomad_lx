@@ -72,8 +72,7 @@ int fcgi_read_headers(char *s, int len, String *hdrs, int *stat)
             
             if (n == 0)
                 break;
-/*fwrite(start_ptr, 1, n, stderr);
-fprintf(stderr, "\n");*/
+            
             if(!strncmp("Status", start_ptr, 6))
             {
                 *(start_ptr + n) = 0;
@@ -118,7 +117,7 @@ int fcgi_(Connect *req, int fcgi_sock, FCGI_client & Fcgi)
             int ret = read_timeout(req->clientSocket, buf, rd, conf->TimeOut);
             if (ret < 0)
             {
-                print_err(req, "<%s:%d> Error: reaf_from_client(): %d\n", __func__, __LINE__, ret);
+                print_err(req, "<%s:%d> Error: reaf_from_client()\n", __func__, __LINE__);
                 return ret;
             }
             
@@ -330,7 +329,7 @@ int fcgi(Connect *req)
         }
     }
     
-    if (timedwait_close_cgi(conf->MaxChldsCgi))
+    if (timedwait_close_cgi(conf->MaxCgiProc))
     {
         return -1;
     }

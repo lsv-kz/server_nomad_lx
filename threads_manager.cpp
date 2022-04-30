@@ -215,7 +215,7 @@ void thr_create_manager(int numProc, RequestManager *ReqMan)
 //    print_err("[%d] <%s:%d> *** Exit thread_req_manager() ***\n", numProc, __func__, __LINE__);
 }
 //======================================================================
-static int nChld;
+static int nProc;
 static int servSock;
 static RequestManager *RM;
 static unsigned long allConn = 0;
@@ -224,48 +224,48 @@ static void signal_handler(int sig)
 {
     if (sig == SIGINT)
     {
-        print_err("[%d] <%s:%d> ### SIGINT ### all_conn=%d\n", nChld, __func__, __LINE__, allConn);
+        print_err("[%d] <%s:%d> ### SIGINT ### all_conn=%d\n", nProc, __func__, __LINE__, allConn);
         shutdown(servSock, SHUT_RDWR);
         close(servSock);
     }
     else if (sig == SIGSEGV)
     {
-        print_err("[%d] <%s:%d> ### SIGSEGV ###\n", nChld, __func__, __LINE__);
+        print_err("[%d] <%s:%d> ### SIGSEGV ###\n", nProc, __func__, __LINE__);
         exit(1);
     }
 }
 //======================================================================
 Connect *create_req(); 
 //======================================================================
-void manager(int sockServer, int numChld)
+void manager(int sockServer, int numProc)
 {
-    RequestManager *ReqMan = new(nothrow) RequestManager(numChld);
+    RequestManager *ReqMan = new(nothrow) RequestManager(numProc);
     if (!ReqMan)
     {
-        print_err("<%s:%d> *********** Exit child %d ***********\n", __func__, __LINE__, numChld);
+        print_err("<%s:%d> *********** Exit child %d ***********\n", __func__, __LINE__, numProc);
         close_logs();
         exit(1);
     }
     
-    nChld = numChld;
+    nProc = numProc;
     servSock = sockServer;
     RM = ReqMan;
 
     if (signal(SIGINT, signal_handler) == SIG_ERR)
     {
-        print_err("[%d]<%s:%d> Error signal(SIGINT): %s\n", numChld, __func__, __LINE__, strerror(errno));
+        print_err("[%d]<%s:%d> Error signal(SIGINT): %s\n", numProc, __func__, __LINE__, strerror(errno));
         exit(EXIT_FAILURE);
     }
     
     if (signal(SIGSEGV, signal_handler) == SIG_ERR)
     {
-        print_err("[%d]<%s:%d> Error signal(SIGSEGV): %s\n", numChld, __func__, __LINE__, strerror(errno));
+        print_err("[%d]<%s:%d> Error signal(SIGSEGV): %s\n", numProc, __func__, __LINE__, strerror(errno));
         exit(EXIT_FAILURE);
     }
     //------------------------------------------------------------------
     if (chdir(conf->rootDir.c_str()))
     {
-        print_err("[%d]<%s:%d> Error chdir(%s): %s\n", numChld, __func__, __LINE__, conf->rootDir.c_str(), strerror(errno));
+        print_err("[%d]<%s:%d> Error chdir(%s): %s\n", numProc, __func__, __LINE__, conf->rootDir.c_str(), strerror(errno));
         exit(EXIT_FAILURE);
     }
     //------------------------------------------------------------------
@@ -276,7 +276,7 @@ void manager(int sockServer, int numChld)
     }
     catch (...)
     {
-        print_err("[%d] <%s:%d> Error create thread(send_file_): errno=%d \n", numChld, __func__, __LINE__, errno);
+        print_err("[%d] <%s:%d> Error create thread(send_file_): errno=%d \n", numProc, __func__, __LINE__, errno);
         exit(errno);
     }
     //------------------------------------------------------------------
@@ -290,7 +290,7 @@ void manager(int sockServer, int numChld)
         }
         catch (...)
         {
-            print_err("[%d] <%s:%d> Error create thread: errno=%d\n", numChld, __func__, __LINE__);
+            print_err("[%d] <%s:%d> Error create thread: errno=%d\n", numProc, __func__, __LINE__);
             exit(errno);
         }
 
@@ -302,7 +302,7 @@ void manager(int sockServer, int numChld)
     thread thrReqMan;
     try
     {
-        thrReqMan = thread(thr_create_manager, numChld, ReqMan);
+        thrReqMan = thread(thr_create_manager, numProc, ReqMan);
     }
     catch (...)
     {
@@ -311,7 +311,7 @@ void manager(int sockServer, int numChld)
         exit(errno);
     }
     //------------------------------------------------------------------    
-    printf("[%d:%s:%d] +++++ num threads=%d, pid=%d, uid=%d, gid=%d  +++++\n", numChld, __func__, 
+    printf("[%d:%s:%d] +++++ num threads=%d, pid=%d, uid=%d, gid=%d  +++++\n", numProc, __func__, 
                             __LINE__, ReqMan->get_num_thr(), getpid(), getuid(), getgid());
 
     while (1)
@@ -325,7 +325,7 @@ void manager(int sockServer, int numChld)
         int clientSocket = accept(sockServer, (struct sockaddr *)&clientAddr, &addrSize);
         if (clientSocket == -1)
         {
-            print_err("[%d] <%s:%d>  Error accept(): %s\n", numChld, __func__, __LINE__, strerror(errno));
+            print_err("[%d] <%s:%d>  Error accept(): %s\n", numProc, __func__, __LINE__, strerror(errno));
             if ((errno == EINTR) || (errno == EMFILE) || (errno == EAGAIN))
                 continue;
             else
@@ -344,7 +344,7 @@ void manager(int sockServer, int numChld)
         int opt = 1;
         ioctl(clientSocket, FIONBIO, &opt);
 
-        req->numChld = numChld;
+        req->numProc = numProc;
         req->numConn = allConn++;
         req->numReq = 0;
         req->clientSocket = clientSocket;
@@ -362,7 +362,7 @@ void manager(int sockServer, int numChld)
     }
     
     n = ReqMan->get_num_thr();
-    print_err("[%d] <%s:%d>  numThr=%d; allNumThr=%u; allConn=%u; open_conn=%d\n", numChld, 
+    print_err("[%d] <%s:%d>  numThr=%d; allNumThr=%u; allConn=%u; open_conn=%d\n", numProc, 
                     __func__, __LINE__, n, ReqMan->get_all_thr(), allConn, get_num_conn());
     
     ReqMan->close_manager();
@@ -373,7 +373,7 @@ void manager(int sockServer, int numChld)
     
     sleep(1);
     delete ReqMan;
-    print_err("[%d] <%s:%d> ***** Exit *****\n", numChld, __func__, __LINE__);
+    print_err("[%d] <%s:%d> ***** Exit *****\n", numProc, __func__, __LINE__);
 }
 //======================================================================
 Connect *create_req(void)

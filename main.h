@@ -81,11 +81,11 @@ struct Config
     String servPort = "20000";
     char tcp_cork = 'n';
     char TcpNoDelay = 'y';
-    int NumChld = 1;
+    int NumProc = 1;
     int MaxThreads = 15;
     int MinThreads = 6;
     int MaxRequestsPerThr = 50;
-    int MaxChldsCgi = 5;
+    int MaxCgiProc = 5;
     int ListenBacklog = 128;
     int SNDBUF_SIZE = 16284;
     int TIMEOUT_POLL = 10;
@@ -95,6 +95,7 @@ struct Config
     int TimeoutKeepAlive = 5;
     int TimeOut = 30;
     int TimeoutCGI = 5;
+    int MaxRanges = 5;
 
     String rootDir = "";
     String cgiDir = "";
@@ -107,6 +108,7 @@ struct Config
 
     fcgi_list_addr *fcgi_list = NULL;
 
+    char AutoIndex = 'y';
     char index_html = 'n';
     char index_php = 'n';
     char index_pl = 'n';
@@ -135,8 +137,8 @@ public:
     Connect *next;
     static int serverSocket;
     
-    unsigned int numConn, numReq;
-    int       numChld, clientSocket;
+    unsigned int numProc, numConn, numReq;
+    int       clientSocket;
     int       err;
     time_t    sock_timer;
     int       timeout;

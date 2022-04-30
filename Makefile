@@ -1,4 +1,4 @@
-CFLAGS = -Wall -O2 -g -std=c++11
+CFLAGS = -Wall -O2 -g -std=c++11  -fno-inline
 
 CC = c++
 #CC = clang++

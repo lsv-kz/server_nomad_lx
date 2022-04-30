@@ -26,7 +26,7 @@ void create_logfiles(const String & log_dir, const String& ServerSoftware)
     fileName << ServerSoftware;
     fileName << ".log";
 
-    flog = open(fileName.c_str(), O_CREAT | O_TRUNC | O_WRONLY, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH); // fopen(logfile, "w");
+    flog = open(fileName.c_str(), O_CREAT | O_TRUNC | O_WRONLY, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
     if(flog == -1)
     {
         cerr << "  Error create log: " << fileName.c_str() << "\n";
@@ -50,7 +50,7 @@ void create_logfiles(const String & log_dir, const String& ServerSoftware)
     fileName << ServerSoftware;
     fileName << "-error.log";
     
-    flog_err = open(fileName.c_str(), O_CREAT | O_TRUNC | O_WRONLY, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH); // fopen(logfile, "w");
+    flog_err = open(fileName.c_str(), O_CREAT | O_APPEND | O_WRONLY, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH); // O_TRUNC
     if(flog_err == -1)
     {
         cerr << "  Error create log_err: " << fileName.c_str() << "\n";
@@ -100,7 +100,7 @@ void print_err(Connect *req, const char *format, ...)
     va_end(ap);
     
     String ss(256);
-    ss << "[" << get_time() << "]-[" << req->numChld << "/" << req->numConn << "/" << req->numReq << "] " << buf;
+    ss << "[" << get_time() << "]-[" << req->numProc << "/" << req->numConn << "/" << req->numReq << "] " << buf;
     
 mtxLog.lock();
     write(flog_err, ss.c_str(), ss.size());
@@ -111,7 +111,7 @@ void print_log(Connect *req)
 {
     String ss(320);
         
-    ss << req->numChld << "/" << req->numConn << "/" << req->numReq << " - " << req->remoteAddr
+    ss << req->numProc << "/" << req->numConn << "/" << req->numReq << " - " << req->remoteAddr
             << " - [" << req->resp.sLogTime << "] - ";
     if (req->reqMethod > 0)
             ss << "\"" << get_str_method(req->reqMethod) << " " << req->uri

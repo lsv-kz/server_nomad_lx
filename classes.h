@@ -7,65 +7,52 @@
 struct Range {
     long long start;
     long long end;
-    long long part_len;
+    long long len;
 };
 //----------------------------------------------------------------------
 class ArrayRanges
 {
 protected:
-    const int ADDITION = 8;
     Range *range = NULL;
     int SizeArray = 0;
-    int Len = 0, LenRanges = 0, MaxRanges = 20;
+    int Len = 0, LenRanges = 0;
     long long sizeFile;
     int err = 0;
     void check_ranges();
     void parse_ranges(char *sRange);
+    
+    void reserve()
+    {
+        if (err) return;
+        if (SizeArray <= 0)
+        {
+            err = 1;
+            return;
+        }
+        
+        range = new(std::nothrow) Range [SizeArray];
+        if (!range)
+        {
+            err = 1;
+            return;
+        }
+    }
     
 public:
     ArrayRanges(const ArrayRanges&) = delete;
     ArrayRanges() = delete;
     ArrayRanges(char *s, long long sz);
     ~ArrayRanges() { if (range) { delete [] range; } }
-    
-    void reserve(int n)
-    {
-        if (n <= 0)
-        {
-            err = 1;
-            return;
-        }
-        
-        if (err) return;
-        if (n <= Len)
-        {
-            err = 1;
-            return;
-        }
-        
-        Range *tmp = new(std::nothrow) Range [n];
-        if (!tmp)
-        {
-            err = 1;
-            return;
-        }
-        
-        for (int i = 0; i < Len; ++i)
-            tmp[i] = range[i];
-        if (range)
-            delete [] range;
-        range = tmp;
-        SizeArray = n;
-    }
 
     ArrayRanges & operator << (const Range& val)
     {
         if (err) return *this;
-        if (Len >= SizeArray)
+        if (!range || (Len >= SizeArray))
         {
-            reserve(SizeArray + ADDITION);
-            if (err) return *this;
+            err = 1;
+            return *this;
         }
+        
         range[Len++] = val;
         return *this;
     }
@@ -103,6 +90,7 @@ class ClChunked
     char buf[CHUNK_SIZE_BUF + MAX_LEN_SIZE_CHUNK + 10];
     ClChunked() {};
     //------------------------------------------------------------------
+    //[[gnu::noinline]]
     int send_chunk(int size)
     {
         if (err) return -1;
