@@ -255,7 +255,7 @@ void event_handler(RequestManager *ReqMan)
             {
                 --ret;
                 print_err(r, "<%s:%d> Error: revents=0x%x\n", __func__, __LINE__, fdwr[i].revents);
-                r->err = -1;
+                r->err = NO_PRINT_LOG;
                 del_from_list(r);
                 end_response(r);
             }

@@ -1,14 +1,13 @@
 #include "classes.h"
 
 using namespace std;
-
 //======================================================================
 void response1(RequestManager *ReqMan)
 {
     const char *p;
     Connect *req;
 
-    while(1)
+    while (1)
     {
         req = ReqMan->pop_resp_list();
         if (!req)
@@ -22,7 +21,7 @@ void response1(RequestManager *ReqMan)
             delete req;
             return;
         }
-        /*------------------------------------------------------------*/
+        //--------------------------------------------------------------
         get_time(req->resp.sLogTime);
         int ret = parse_startline_request(req, req->arrHdrs[0].ptr, req->arrHdrs[0].len);
         if (ret)
@@ -46,10 +45,9 @@ void response1(RequestManager *ReqMan)
             int optval = 1;
             setsockopt(req->clientSocket, SOL_TCP, TCP_CORK, &optval, sizeof(optval));
         }
-        /*--------------------------------------------------------*/
+        //--------------------------------------------------------------
         if ((req->httpProt != HTTP10) && (req->httpProt != HTTP11))
         {
-            req->httpProt = HTTP11;
             req->connKeepAlive = 0;
             req->err = -RS505;
             goto end;
@@ -543,7 +541,7 @@ int create_multipart_head(Connect *req, struct Range *ranges, char *buf, int len
     {
         n = snprintf(buf, len_buf,
             "Content-Range: bytes %lld-%lld/%lld\r\n\r\n",
-             ranges->start, ranges->end, req->resp.fileSize);
+            ranges->start, ranges->end, req->resp.fileSize);
         buf += n;
         len_buf -= n;
         all += n;

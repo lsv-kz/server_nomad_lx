@@ -6,18 +6,10 @@ const char *status_resp(int st);
 //======================================================================
 int send_response_headers(Connect *req, const String *hdrs)
 {
-    if(req->httpProt == HTTP09)
-    {
-        print_err(req, "<%s:%d> HTTP Protocol: %s\n", __func__, __LINE__, get_str_http_prot(req->httpProt));
-        return -1;
-    }
-    else if ((req->httpProt == HTTP2) || (req->httpProt == 0))
-        req->httpProt = HTTP11;
-
     String resp(512);
     if (resp.error())
     {
-        print_err("<%s:%d> Error create String object\n", __func__, __LINE__);
+        print_err(req, "<%s:%d> Error create String object\n", __func__, __LINE__);
         return -1;
     }
 
@@ -25,7 +17,7 @@ int send_response_headers(Connect *req, const String *hdrs)
         << "Date: " << req->resp.sLogTime << "\r\n"
         << "Server: " << conf->ServerSoftware << "\r\n";
 
-    if(req->reqMethod == M_OPTIONS)
+    if (req->reqMethod == M_OPTIONS)
         resp << "Allow: OPTIONS, GET, HEAD, POST\r\n";
 
     if (req->resp.numPart == 1)
@@ -42,7 +34,7 @@ int send_response_headers(Connect *req, const String *hdrs)
     {
         if (req->resp.respContentType)
             resp << "Content-Type: " << req->resp.respContentType << "\r\n";
-        if(req->resp.respContentLength >= 0)
+        if (req->resp.respContentLength >= 0)
         {
             resp << "Content-Length: " << req->resp.respContentLength << "\r\n";
             if (req->resp.respStatus == RS200)
@@ -53,7 +45,7 @@ int send_response_headers(Connect *req, const String *hdrs)
             resp << "Content-Range: bytes */" << req->resp.fileSize << "\r\n";
     }
 
-    if(req->resp.respStatus == RS101)
+    if (req->resp.respStatus == RS101)
     {
         resp << "Upgrade: HTTP/1.1\r\n"
             << "Connection: Upgrade\r\n";
@@ -62,24 +54,22 @@ int send_response_headers(Connect *req, const String *hdrs)
         resp << "Connection: " << (req->connKeepAlive == 0 ? "close" : "keep-alive") << "\r\n";
 
     if (hdrs)
-    {
         resp << hdrs->c_str();
-    }
 
     resp << "\r\n";
 
     if (resp.error())
     {
-        print_err("<%s:%d> Error create response headers\n", __func__, __LINE__);
+        print_err(req, "<%s:%d> Error create response headers\n", __func__, __LINE__);
         req->req_hdrs.iReferer = MAX_HEADERS - 1;
         req->req_hdrs.Value[req->req_hdrs.iReferer] = "Error create response headers";
         return -1;
     }
 
     int n = write_to_client(req, resp.c_str(), resp.size(), conf->TimeOut);
-    if(n <= 0)
+    if (n <= 0)
     {
-        print_err("<%s:%d> Sent to client response error; (%d)\n", __func__, __LINE__, n);
+        print_err(req, "<%s:%d> Sent to client response error; (%d)\n", __func__, __LINE__, n);
         req->req_hdrs.iReferer = MAX_HEADERS - 1;
         req->req_hdrs.Value[req->req_hdrs.iReferer] = "Error send response headers";
         return -1;
@@ -90,25 +80,21 @@ int send_response_headers(Connect *req, const String *hdrs)
 //======================================================================
 void send_message(Connect *req, const char *msg, const String *hdrs)
 {
-    if (!msg)
-        msg = "";
     String html(256);
-
     if (req->resp.respStatus != RS204)
     {
         const char *title = status_resp(req->resp.respStatus);
-        html << "<!DOCTYPE html>\n"
-                "<html>\n"
-                "<head>\n"
-                "<title>" << title << "</title>\n"
-                "<meta charset=\"utf-8\">\n"
-                "</head>\n"
-                "<body>\n"
-                "<h3>" << title << "</h3>\n"
-                "<p>" << (msg ? msg : "") <<  "</p>\n"
-                "<hr>\n" << req->resp.sLogTime << "\n"
-                "</body>\n"
-                "</html>";
+        html << "<html>\r\n"
+                "<head>\r\n"
+                "<title>" << title << "</title>\r\n"
+                "<meta charset=\"utf-8\">\r\n"
+                "</head>\r\n"
+                "<body>\r\n"
+                "<h3>" << title << "</h3>\r\n"
+                "<p>" << (msg ? msg : "") <<  "</p>\r\n"
+                "<hr>\n" << req->resp.sLogTime << "\r\n"
+                "</body>\r\n"
+                "</html>\r\n";
         
         req->resp.respContentType = "text/html";
         req->resp.respContentLength = html.size();
@@ -121,24 +107,24 @@ void send_message(Connect *req, const char *msg, const String *hdrs)
     
     req->connKeepAlive = 0;
 
-    if (send_response_headers(req, hdrs))
+    if ((req->httpProt != HTTP09) && send_response_headers(req, hdrs))
     {
         return;
     }
 
-    if(req->resp.respContentLength > 0)
+    if (req->resp.respContentLength > 0)
     {
         req->resp.send_bytes = write_to_client(req, html.c_str(), req->resp.respContentLength, conf->TimeOut);
-        if(req->resp.send_bytes <= 0)
+        if (req->resp.send_bytes <= 0)
         {
-            print_err("<%s:%d> Error write_timeout()\n", __func__, __LINE__);
+            print_err(req, "<%s:%d> Error write_timeout()\n", __func__, __LINE__);
         }
     }
 }
 //======================================================================
 const char *status_resp(int st)
 {
-    switch(st)
+    switch (st)
     {
         case 0:
             return "";
