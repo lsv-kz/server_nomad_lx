@@ -36,6 +36,7 @@
 #include <netinet/tcp.h>
 #include <netinet/in.h>
 #include <netdb.h>
+#include <sys/un.h>
 
 #include "String.h"
 
@@ -106,8 +107,6 @@ struct Config
     String UsePHP = "n";
     String PathPHP = "";
 
-    fcgi_list_addr *fcgi_list = NULL;
-
     char AutoIndex = 'y';
     char index_html = 'n';
     char index_php = 'n';
@@ -121,6 +120,20 @@ struct Config
     
     String user = "";
     String group = "";
+
+    fcgi_list_addr *fcgi_list;
+    ~Config()
+    {
+        fcgi_list_addr *t;
+        while (fcgi_list)
+        {
+            t = fcgi_list;
+            fcgi_list = fcgi_list->next;
+            if (t)
+                delete t;
+        }
+        std::cout << "******* " << getpid() << " *******\n";
+    }
 };
 //----------------------------------------------------------------------
 extern const Config* const conf;
@@ -256,7 +269,6 @@ int index_dir(Connect *req, String& path);
 int cgi(Connect *req);
 int fcgi(Connect *req);
 int create_fcgi_socket(const char *host);
-void free_fcgi_list();
 //----------------------------------------------------------------------
 int encode(const char *s_in, char *s_out, int len_out);
 int decode(const char *s_in, int len_in, char *s_out, int len);
@@ -306,7 +318,7 @@ void close_logs(void);
 void print_err(Connect *req, const char *format, ...);
 void print_log(Connect *req);
 //----------------------------------------------------------------------
-int timedwait_close_cgi(int MaxChldsCgi);
+int timedwait_close_cgi();
 void cgi_dec();
 //----------------------------------------------------------------------
 void end_response(Connect *req);

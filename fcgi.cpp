@@ -329,7 +329,7 @@ int fcgi(Connect *req)
         }
     }
     
-    if (timedwait_close_cgi(conf->MaxCgiProc))
+    if (timedwait_close_cgi())
     {
         return -1;
     }

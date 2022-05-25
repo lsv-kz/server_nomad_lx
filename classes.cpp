@@ -1,123 +1,159 @@
 #include "classes.h"
 
-    //==================================================================
-    void Connect::init()
-    {
-        sRange = NULL;
-        //------------------------------------
-        uri = NULL;
-        p_newline = bufReq;
-        tail = NULL;
-        //------------------------------------
-        err = 0;
-        lenTail = 0;
-        i_bufReq = 0;
-        i_arrHdrs = 0;
-        reqMethod = 0;
-        httpProt = 0;
-        connKeepAlive = 0;
-        
-        req_hdrs = {-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1LL,0};
-        
-        resp.fd = -1;
-        resp.respStatus = 0;
-        resp.respContentType = NULL;
-        
-        resp.countRespHeaders = 0;
-        resp.send_bytes = 0LL;
-        resp.numPart = 0;
-        resp.scriptName = NULL;
-        
-        resp.offset = 0;
-        resp.respContentLength = -1LL;
-    }
-    
-    int Connect::hd_read()
-    {
-        errno = 0;
-        if (err) return -1;
-        int n = recv(clientSocket, bufReq + i_bufReq, LEN_BUF_REQUEST - i_bufReq - 1, 0);
-        if (n < 0)
-            return -1;
-        else if (n == 0)
-            return NO_PRINT_LOG;
+//======================================================================
+void Connect::init()
+{
+    sRange = NULL;
+    //------------------------------------
+    uri = NULL;
+    p_newline = bufReq;
+    tail = NULL;
+    //------------------------------------
+    err = 0;
+    lenTail = 0;
+    i_bufReq = 0;
+    i_arrHdrs = 0;
+    reqMethod = 0;
+    httpProt = 0;
+    connKeepAlive = 0;
 
-        lenTail += n;
-        
-        i_bufReq += n;
-        bufReq[i_bufReq] = 0;
+    req_hdrs = {-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1LL,0};
 
-        n = empty_line();
-        if (n == 1)
-        {
-            timeout = conf->TimeOut;
-            return i_bufReq;
-        }
-        else if (n < 0)
-            return n;
-        
-        return 0;
-    }
-    
-    int Connect::empty_line()
+    resp.fd = -1;
+    resp.respStatus = 0;
+    resp.respContentType = NULL;
+
+    resp.countRespHeaders = 0;
+    resp.send_bytes = 0LL;
+    resp.numPart = 0;
+    resp.scriptName = NULL;
+
+    resp.offset = 0;
+    resp.respContentLength = -1LL;
+}
+
+int Connect::hd_read()
+{
+    errno = 0;
+    if (err) return -1;
+    int n = recv(clientSocket, bufReq + i_bufReq, LEN_BUF_REQUEST - i_bufReq - 1, 0);
+    if (n < 0)
+        return -1;
+    else if (n == 0)
+        return NO_PRINT_LOG;
+
+    lenTail += n;
+
+    i_bufReq += n;
+    bufReq[i_bufReq] = 0;
+
+    n = empty_line();
+    if (n == 1)
     {
-        if (err) return -1;
         timeout = conf->TimeOut;
-        char *pr, *pn;
-        while (lenTail > 0)
-        {
-            pr = (char*)memchr(p_newline, '\r', lenTail - 1);
-            pn = (char*)memchr(p_newline, '\n', lenTail);
-            if (pr && pn)
-            {
-                if ((pn - pr) != 1)
-                    return -RS400;
-            
-                if ((pn - p_newline) == 1)
-                {
-                    lenTail -= (pn+1 - p_newline);
-                    if (lenTail > 0)
-                        tail = pn + 1;
-                    else
-                    {
-                        tail = NULL;
-                        lenTail = 0;
-                    }
-                
-                    return 1;
-                }
+        return i_bufReq;
+    }
+    else if (n < 0)
+        return n;
 
-                if (i_arrHdrs < MAX_HEADERS)
-                {
-                    arrHdrs[i_arrHdrs].ptr = p_newline;
-                    arrHdrs[i_arrHdrs].len = pn - p_newline + 1;
-                    ++i_arrHdrs;
-                }
+    return 0;
+}
+    
+int Connect::empty_line()
+{
+    if (err) return -1;
+    timeout = conf->TimeOut;
+    char *pr, *pn;
+    while (lenTail > 0)
+    {
+        pr = (char*)memchr(p_newline, '\r', lenTail - 1);
+        pn = (char*)memchr(p_newline, '\n', lenTail);
+        if (pr && pn)
+        {
+            if ((pn - pr) != 1)
+                return -RS400;
+
+            if ((pn - p_newline) == 1)
+            {
+                lenTail -= (pn+1 - p_newline);
+                if (lenTail > 0)
+                    tail = pn + 1;
                 else
                 {
-                    return -RS500;
+                    tail = NULL;
+                    lenTail = 0;
                 }
 
-                lenTail -= (pn + 1 - p_newline);
-                p_newline = pn + 1;
+                return 1;
             }
-            else if (pr && (!pn))
-                return -RS400;
-            else if ((!pr) && pn)
-                return -RS400;
-            else
-                break;
-        }
 
-        return 0;
+            if (i_arrHdrs < MAX_HEADERS)
+            {
+                arrHdrs[i_arrHdrs].ptr = p_newline;
+                arrHdrs[i_arrHdrs].len = pn - p_newline + 1;
+                ++i_arrHdrs;
+            }
+            else
+            {
+                return -RS500;
+            }
+
+            lenTail -= (pn + 1 - p_newline);
+            p_newline = pn + 1;
+        }
+        else if (pr && (!pn))
+            return -RS400;
+        else if ((!pr) && pn)
+            return -RS400;
+        else
+            break;
     }
+
+    return 0;
+}
 //======================================================================
-void ArrayRanges::check_ranges()
+/*void ArrayRanges::check_ranges()
 {
     if (err) return;
     Range *r = range;
 
-    for ( int n = Len - 1; n > 0; n--)
+    for ( int n = nRanges - 1; n > 0; n--)
+    {
+        for (int i = n - 1; i >= 0; i--)
+        {
+            if (((r[n].end + 1) >= r[i].start) && ((r[i].end + 1) >= r[n].start))
+            {
+                nRanges--;
+                if (r[n].start < r[i].start)
+                    r[i].start = r[n].start;
+
+                if (r[n].end > r[i].end)
+                    r[i].end = r[n].end;
+
+                r[i].len = r[i].end - r[i].start + 1;
+                r[n].len = 0;
+                
+                if (((nRanges) > n) && (r[nRanges].len > 0))
+                {
+                    r[n].start = r[nRanges].start;
+                    r[n].end = r[nRanges].end;
+                    r[n].len = r[nRanges].len;
+                    r[nRanges].len = 0;
+                }
+
+                n--;
+            }
+        }
+    }
+}*/
+//----------------------------------------------------------------------
+void ArrayRanges::check_ranges()
+{
+    if (err) return;
+    int num = nRanges;
+    Range *r = range;
+
+    for ( int n = num - 1; n > 0; n--)
     {
         for (int i = n - 1; i >= 0; i--)
         {
@@ -133,12 +169,12 @@ void ArrayRanges::check_ranges()
                 r[n].len = 0;
 
                 n--;
-                LenRanges--;
+                nRanges--;
             }
         }
     }
     
-    for (int i = 0, j = 0; j < Len; j++)
+    for (int i = 0, j = 0; j < num; j++)
     {
         if (r[j].len)
         {
@@ -162,16 +198,10 @@ void ArrayRanges::parse_ranges(char *sRange)
     int i = 0;
     const char *p1;
     char *p2;
-    
-    if (sRange == NULL)
-    {
-        err = 1;
-        return;
-    }
-    
+
     p1 = p2 = sRange;
     
-    for ( ; Len < SizeArray; )
+    for ( ; nRanges < SizeArray; )
     {
         if (err) return;
         if ((*p1 >= '0') && (*p1 <= '9'))
@@ -298,9 +328,8 @@ ArrayRanges::ArrayRanges(char *s, long long sz)
     reserve();
     sizeFile = sz;
     parse_ranges(s);
-    LenRanges = Len;
-    if ((Len == 0) && (err == 0))
+    if ((nRanges == 0) && (err == 0))
         err = 416;
-    //else if (Len > 1)
+    //else if (nRanges > 1)
     //    check_ranges();
 }

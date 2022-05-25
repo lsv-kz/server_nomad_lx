@@ -302,7 +302,6 @@ mtx_.lock();
     }
     else
         list_new_start = list_new_end = req;
-    
 mtx_.unlock();
     cond_.notify_one();
 }

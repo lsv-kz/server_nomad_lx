@@ -14,10 +14,7 @@ RequestManager::RequestManager(int n)
     numChld = n;
 }
 //----------------------------------------------------------------------
-RequestManager::~RequestManager()
-{
-    free_fcgi_list();
-}
+RequestManager::~RequestManager() {}
 //----------------------------------------------------------------------
 int RequestManager::get_num_chld()
 {

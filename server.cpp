@@ -46,7 +46,6 @@ int main(int argc, char *argv[])
     if (sockServer == -1)
     {
         fprintf(stderr, "<%s:%d> Error: create_server_socket()=%d\n", __func__, __LINE__, sockServer);
-        free_fcgi_list();
         close_logs();
         exit(1);
     }
@@ -80,6 +79,10 @@ int main(int argc, char *argv[])
          << "\n   log_dir = " << conf->logDir.c_str()
          << "\n   ShowMediaFiles = " << conf->ShowMediaFiles
          << "\n   ClientMaxBodySize = " << conf->ClientMaxBodySize
+         << "\n   index_html = " << conf->index_html
+         << "\n   index_php = " << conf->index_php
+         << "\n   index_pl = " << conf->index_pl
+         << "\n   index_fcgi = " << conf->index_fcgi
          << "\n\n";
 
     cerr << "   uid=" << getuid() << "; gid=" << getgid() << "\n\n";
@@ -130,8 +133,6 @@ int main(int argc, char *argv[])
     {
         print_err("<> wait() pid: %d\n", pid);
     }
-
-    free_fcgi_list();
 
     print_err("<%s:%d> Exit server\n", __func__, __LINE__);
     close_logs();

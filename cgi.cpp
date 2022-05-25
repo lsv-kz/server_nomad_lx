@@ -6,11 +6,11 @@ mutex mtx_chld;
 condition_variable condCloseCGI;
 int num_cgi_chlds = 0;
 //======================================================================
-int timedwait_close_cgi(int MaxChldsCgi)
+int timedwait_close_cgi()
 {
     int ret = 0;
 unique_lock<mutex> lk(mtx_chld);
-    while (num_cgi_chlds >= MaxChldsCgi)
+    while (num_cgi_chlds >= conf->MaxCgiProc)
     {
         if (condCloseCGI.wait_for(lk, chrono::milliseconds(1000 * conf->TimeoutCGI)) == cv_status::timeout)
         {
@@ -467,7 +467,7 @@ int cgi(Connect *req)
         }
     }
 
-    if (timedwait_close_cgi(conf->MaxCgiProc))
+    if (timedwait_close_cgi())
     {
         return -1;
     }

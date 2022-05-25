@@ -9,27 +9,27 @@ const int minOpenFD = 6;
 int check_path(String & path)
 {
     struct stat st;
-    
+
     int ret = stat(path.c_str(), &st);
     if (ret == -1)
     {
         fprintf(stderr, "<%s:%d> Error stat(): %s\n", __func__, __LINE__, strerror(errno));
         return -1;
     }
-    
+
     if (!S_ISDIR(st.st_mode))
     {
         fprintf(stderr, "<%s:%d> [%s] is not directory\n", __func__, __LINE__, path.c_str());
         return -1;
     }
-    
+
     char path_[PATH_MAX] = "";
     if (!realpath(path.c_str(), path_))
     {
         fprintf(stderr, "<%s:%d> Error realpath(): %s\n", __func__, __LINE__, strerror(errno));
         return -1;
     }
-    
+
     path = path_;
 
     return 0;
@@ -43,7 +43,7 @@ void create_conf_file(const char *path)
         fprintf(stderr, "<%s> Error create conf file (%s): %s\n", __func__, path, strerror(errno));
         exit(1);
     }
-    
+
     fconf << "ServerSoftware   " << "x" << "\n";
     fconf << "ServerAddr   " << "0.0.0.0" << "\n";
     fconf << "Port         ?\n";
@@ -52,44 +52,44 @@ void create_conf_file(const char *path)
     fconf << "DocumentRoot " << c.rootDir.c_str() << "\n";
     fconf << "ScriptPath   " << c.cgiDir.c_str() << "\n";
     fconf << "LogPath      " << c.logDir.c_str() << "\n\n";
-    
+
     fconf << "MaxRequestsPerThr " << c.MaxRequestsPerThr << "\n\n";
-    
+
     fconf << "ListenBacklog " << c.ListenBacklog << "\n\n";
-    
+
     fconf << "SndBufSize   " << c.SNDBUF_SIZE << "\n";
     fconf << "MaxRequests " << c.MAX_REQUESTS << "\n\n";
-    
+
     fconf << "SendFile  " << c.SEND_FILE << "\n";
     fconf << "TimeoutPoll  " << c.TIMEOUT_POLL << "\n\n";
-    
+
     fconf << "NumProc " << c.NumProc << "\n";
     fconf << "MaxThreads " << c.MaxThreads << "\n";
     fconf << "MinThreads " << c.MinThreads << "\n\n";
-    
+
     fconf << "MaxCgiProc " << c.MaxCgiProc << "\n\n";
 
     fconf << "KeepAlive  " << c.KeepAlive << " #   y/n" << "\n";
     fconf << "TimeoutKeepAlive " << c.TimeoutKeepAlive << "\n";
     fconf << "TimeOut    " << c.TimeOut << "\n";
     fconf << "TimeoutCGI " << c.TimeoutCGI << "\n\n";
-    
+
     fconf << "MaxRanges  %d\n\n" << c.MaxRanges << "\n\n";
-    
+
     fconf << "ClientMaxBodySize " << c.ClientMaxBodySize << "\n\n";
-    
+
     fconf << " UsePHP     n  # php-fpm # php-cgi \n";
     fconf << "# PathPHP   /usr/bin/php-cgi\n";
     fconf << "# PathPHP  127.0.0.1:9000  #  /run/php/php7.0-fpm.sock \n\n";
-    
+
     fconf << "index {\n"
                 "\t#index.html\n"
                 "}\n\n";
-    
+
     fconf << "fastcgi {\n"
                 "\t#/test  127.0.0.1:9009\n"
                 "}\n\n";
-    
+
     fconf << "ShowMediaFiles " << c.ShowMediaFiles << " #  y/n" << "\n\n";
 
     fconf << "User nobody     # www-data\n";
@@ -98,40 +98,108 @@ void create_conf_file(const char *path)
     fconf.close();
 }
 //======================================================================
-fcgi_list_addr *create_fcgi_list()
+int getLine(ifstream &fi, String &ss)
 {
-    fcgi_list_addr *tmp;
-    tmp = new(nothrow) fcgi_list_addr;
-    if (!tmp)
+    ss = "";
+    char ch;
+    int n = 0, wr = 1;
+
+    while (fi.get(ch))
+    {
+        if ((char)ch == '\n')
+        {
+            if (n)
+                return n;
+            else
+            {
+                wr = 1;
+                ss = "";
+                continue;
+            }
+        }
+
+        if ((wr == 0) || (ch == '\r'))
+            continue;
+
+        switch (ch)
+        {
+            case ' ':
+            case '\t':
+                if (n)
+                {
+                    ss << ' ';
+                    ++n;
+                }
+                break;
+            case '#':
+                wr = 0;
+                break;
+            case '{':
+            case '}':
+                if (n)
+                    fi.seekg(-1, ios::cur);
+                else
+                {
+                    ss << ch;
+                    ++n;
+                }
+                return n;
+            default:
+                ss << ch;
+                ++n;
+        }
+    }
+
+    if (n)
+        return n;
+    return -1;
+}
+//======================================================================
+int find_bracket(ifstream &fi)
+{
+    char ch;
+    int grid = 0;
+
+    while (fi.get(ch))
+    {
+        if (ch == '#')
+            grid = 1;
+        
+        if (ch == '\n')
+            grid = 0;
+        
+        if ((ch == '}') && (grid == 0))
+            return 0;
+        
+        if ((ch == '{') && (grid == 0))
+            return 1;
+    }
+
+    return 0;
+}
+//======================================================================
+void create_fcgi_list(fcgi_list_addr **l, const String &s1, const String &s2)
+{
+    if (l == NULL)
+    {
+        fprintf(stderr, "<%s:%d> Error pointer = NULL\n", __func__, __LINE__);
+        exit(errno);
+    }
+
+    fcgi_list_addr *t;
+    try {
+        t = new fcgi_list_addr;
+    }
+    catch (...)
     {
         fprintf(stderr, "<%s:%d> Error malloc(): %s\n", __func__, __LINE__, strerror(errno));
         exit(errno);
     }
-    
-    tmp->next = NULL;
-    
-    return tmp;
-}
-//======================================================================
-int getLine(ifstream & fi, String &s)
-{
-    int n = 0;
-    char c;
-    s.clear();
-    while (fi.get(c) && (n < 256))
-    {
-        if (c == '\n') break;
-        s << c;
-        ++n;
-    }
-    
-    if (c != '\n')
-    {
-        s = "";
-        n = 0;
-    }
 
-    return n;
+    t->next = *l;
+    t->scrpt_name = s1;
+    t->addr = s2;
+    *l = t;
 }
 //======================================================================
 void read_conf_file(const char *path_conf)
@@ -140,8 +208,7 @@ void read_conf_file(const char *path_conf)
 
     nameFile << path_conf;
     nameFile << "/server.conf";
-    fcgi_list_addr *end = NULL;
-    
+
     ifstream fconf(nameFile.c_str(), ios::binary);
     if (!fconf.is_open())
     {
@@ -150,13 +217,12 @@ void read_conf_file(const char *path_conf)
         exit(1);
     }
 
-    while (!fconf.eof())
-    {
-        getLine(fconf, ss);
-        ss >> s;
+    c.index_html = c.index_php = c.index_pl = c.index_fcgi = 'n';
+    c.fcgi_list = NULL;
 
-        if (s[0] == '#')
-            continue;
+    while (getLine(fconf, ss) > 0)
+    {
+        ss >> s;
 
         if (s ==  "ServerAddr")
             ss >> c.host;
@@ -214,24 +280,23 @@ void read_conf_file(const char *path_conf)
             ss >> c.ClientMaxBodySize;
         else if (s == "index")
         {
-            ss >> s;
-            if (s != "{")
+            if (find_bracket(fconf) == 0)
             {
-                getLine(fconf, ss);
-                ss >> s;
-                if (s != "{")
-                    continue;
+                fprintf(stderr, "<%s:%d> Error Error not found \"{\"\n", __func__, __LINE__);
+                exit(1);
             }
-            
-            while (!fconf.eof())
-            {
-                getLine(fconf, ss);
-                ss >> s;
 
-                if ((s[0] == '#') || (s[0] == '{'))
-                    continue;
-                else if (s[0] == '}')
+            while (getLine(fconf, ss) > 0)
+            {
+                ss >> s;
+                if (s == "}")
                     break;
+
+                if (s == "{")
+                {
+                    fprintf(stderr, "<%s:%d> Error read config file\n", __func__, __LINE__);
+                    exit(1);
+                }
 
                 if (s == "index.html")
                     c.index_html = 'y';
@@ -241,11 +306,13 @@ void read_conf_file(const char *path_conf)
                     c.index_pl = 'y';
                 else if (s == "index.fcgi")
                     c.index_fcgi = 'y';
+                else
+                    printf("<%s:%d> Error read conf file(): \"index\" [%s]\n", __func__, __LINE__, s.c_str()), exit(1);
             }
-            
-            if (s[0] != '}')
+
+            if (s != "}")
             {
-                fprintf(stderr, "   Error read config file\n");
+                fprintf(stderr, "<%s:%d> Error not found \"}\"\n", __func__, __LINE__);
                 exit(1);
             }
         }
@@ -255,48 +322,48 @@ void read_conf_file(const char *path_conf)
             ss >> c.group;
         else if (s == "fastcgi")
         {
-            ss >> s;
-            if (s != "{")
+            if (find_bracket(fconf) == 0)
             {
-                getLine(fconf, ss);
-                ss >> s;
-                if (s != "{")
-                    continue;
-            }
-            
-            while (!fconf.eof())
-            {
-                getLine(fconf, ss);
-                ss >> s;
-
-                if ((s[0] == '#') || (s.size() == 0) || (s[0] == '{'))
-                    continue;
-                else if (s[0] == '}')
-                    break;
-
-                if (!end)
-                {
-                    end = c.fcgi_list = create_fcgi_list();
-                    c.fcgi_list->scrpt_name = s;
-                    ss >> c.fcgi_list->addr;
-                }
-                else
-                {
-                    end->next = create_fcgi_list();
-                    end->next->scrpt_name = s;
-                    ss >> end->next->addr;
-                    end = end->next;
-                }
-            }
-            if (s[0] != '}')
-            {
-                fprintf(stderr, "   Error read config file\n");
+                fprintf(stderr, "<%s:%d> Error Error not found \"{\"\n", __func__, __LINE__);
                 exit(1);
             }
+
+            while (getLine(fconf, ss) > 0)
+            {
+                ss >> s;
+                if (s == "}")
+                    break;
+                if (s == "{")
+                {
+                    fprintf(stderr, "<%s:%d> Error read config file\n", __func__, __LINE__);
+                    exit(1);
+                }
+
+                String sTmp;
+                ss >> sTmp;
+                create_fcgi_list(&c.fcgi_list, s, sTmp);
+            }
+
+            if (s != "}")
+            {
+                fprintf(stderr, "<%s:%d> Error not found \"}\"\n", __func__, __LINE__);
+                exit(1);
+            }
+        }
+        else
+        {
+            fprintf(stderr, "<%s:%d> Error read config file: [%s]\n", __func__, __LINE__, s.c_str());
+            exit(1);
         }
     }
 
     fconf.close();
+
+    fcgi_list_addr *i = c.fcgi_list;
+    for (; i; i = i->next)
+    {
+        fprintf(stderr, "[%s] = [%s]\n", i->scrpt_name.c_str(), i->addr.c_str());
+    }
     //------------------------------------------------------------------
     if (check_path(c.logDir) == -1)
     {
@@ -316,13 +383,13 @@ void read_conf_file(const char *path_conf)
         c.cgiDir = "";
         fprintf(stderr, "!!! Error ScriptPath [%s]\n", c.cgiDir.c_str());
     }
-    
+
     if ((c.NumProc < 1) || (c.NumProc > 8))
     {
         print_err("<%s:%d> Error: Number of Processes = %d; [1 < NumChld <= 6]\n", __func__, __LINE__, c.NumProc);
         exit(1);
     }
-    
+
     if (c.MinThreads > c.MaxThreads)
     {
         print_err("<%s:%d> Error: NumThreads > MaxThreads\n", __func__, __LINE__);
@@ -390,7 +457,7 @@ void read_conf_file(const char *path_conf)
             }
             c.server_uid = passwdbuf->pw_uid;
         }
-        
+
         c.server_gid = strtol(c.group.c_str(), &p, 0);
         if (*p == '\0')
         {
@@ -425,17 +492,6 @@ void read_conf_file(const char *path_conf)
     {
         c.server_uid = getuid();
         c.server_gid = getgid();
-    }
-}
-//======================================================================
-void free_fcgi_list()
-{
-    fcgi_list_addr *prev;
-    while (c.fcgi_list)
-    {
-        prev = c.fcgi_list;
-        c.fcgi_list = c.fcgi_list->next;
-        if (prev) delete prev;
     }
 }
 //======================================================================

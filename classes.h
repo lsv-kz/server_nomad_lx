@@ -15,7 +15,7 @@ class ArrayRanges
 protected:
     Range *range = NULL;
     int SizeArray = 0;
-    int Len = 0, LenRanges = 0;
+    int nRanges = 0;
     long long sizeFile;
     int err = 0;
     void check_ranges();
@@ -47,32 +47,32 @@ public:
     ArrayRanges & operator << (const Range& val)
     {
         if (err) return *this;
-        if (!range || (Len >= SizeArray))
+        if (!range || (nRanges >= SizeArray))
         {
             err = 1;
             return *this;
         }
         
-        range[Len++] = val;
+        range[nRanges++] = val;
         return *this;
     }
     
     Range *get(int i)
     {
+        if (err) return NULL;
         if (i < 0)
         {
             err = 1;
             return NULL;
         }
-        
-        if (err) return NULL;
-        if (i < Len)
+
+        if (i < nRanges)
             return range + i;
         else
             return NULL;
     }
     
-    int size() { if (err) return 0; return LenRanges; }
+    int size() { if (err) return 0; return nRanges; }
     int capacity() { if (err) return 0; return SizeArray; }
     int error() { return -err; }
 };
