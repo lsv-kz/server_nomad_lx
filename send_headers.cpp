@@ -81,7 +81,7 @@ int send_response_headers(Connect *req, const String *hdrs)
 void send_message(Connect *req, const char *msg, const String *hdrs)
 {
     String html(256);
-    if (req->resp.respStatus != RS204)
+    if ((req->resp.respStatus != RS204) && (req->reqMethod != M_HEAD))
     {
         const char *title = status_resp(req->resp.respStatus);
         html << "<html>\r\n"
@@ -92,14 +92,15 @@ void send_message(Connect *req, const char *msg, const String *hdrs)
                 "<body>\r\n"
                 "<h3>" << title << "</h3>\r\n"
                 "<p>" << (msg ? msg : "") <<  "</p>\r\n"
-                "<hr>\n" << req->resp.sLogTime << "\r\n"
+                "<hr>\r\n" << req->resp.sLogTime << "\r\n"
                 "</body>\r\n"
                 "</html>\r\n";
         
         req->resp.respContentType = "text/html";
         req->resp.respContentLength = html.size();
     }
-    else
+
+    if (req->resp.respStatus == RS204)
     {
         req->resp.respContentLength = 0;
         req->resp.respContentType = NULL;
@@ -108,9 +109,10 @@ void send_message(Connect *req, const char *msg, const String *hdrs)
     req->connKeepAlive = 0;
 
     if ((req->httpProt != HTTP09) && send_response_headers(req, hdrs))
-    {
         return;
-    }
+
+    if ((req->reqMethod == M_HEAD) || (req->resp.respStatus = RS204))
+        return;
 
     if (req->resp.respContentLength > 0)
     {
