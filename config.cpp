@@ -166,7 +166,7 @@ int isbool(const char *s)
         return 0;
     if (strlen(s) != 1)
         return 0;
-    return ((s[0] == 'y') || (s[0] == 'n'));
+    return (((char)tolower(s[0]) == 'y') || ((char)tolower(s[0]) == 'n'));
 }
 //======================================================================
 int find_bracket(FILE *f)
@@ -177,15 +177,12 @@ int find_bracket(FILE *f)
     {
         if (ch == '#')
             grid = 1;
-
-        if (ch == '\n')
+        else if (ch == '\n')
             grid = 0;
-
-        if ((ch == '}') && (grid == 0))
-            return 0;
-
-        if ((ch == '{') && (grid == 0))
+        else if ((ch == '{') && (grid == 0))
             return 1;
+        else if ((ch != ' ') && (ch != '\t') && (grid == 0))
+            return 0;
     }
 
     return 0;
@@ -215,16 +212,13 @@ void create_fcgi_list(fcgi_list_addr **l, const String &s1, const String &s2)
 //======================================================================
 void read_conf_file(const char *path_conf)
 {
-    String ss, nameFile;
+    String ss;
 
-    nameFile << path_conf;
-    nameFile << "/server.conf";
-
-    FILE *fconf = fopen(nameFile.c_str(), "r");
+    FILE *fconf = fopen(path_conf, "r");
     if (!fconf)
     {
-        create_conf_file(nameFile.c_str());
-        fprintf(stderr, " Correct config file: %s\n", nameFile.c_str());
+        create_conf_file(path_conf);
+        fprintf(stderr, " Correct config file: %s\n", path_conf);
         exit(1);
     }
 
@@ -247,13 +241,13 @@ void read_conf_file(const char *path_conf)
             else if (s1 == "ServerSoftware")
                 s2 >> c.ServerSoftware;
             else if ((s1 == "tcp_cork") && isbool(s2.c_str()))
-                s2 >> c.tcp_cork;
+                c.tcp_cork = (char)tolower(s2[0]);
             else if ((s1 == "TcpNoDelay") && isbool(s2.c_str()))
-                s2 >> c.TcpNoDelay;
+                c.TcpNoDelay = (char)tolower(s2[0]);
             else if ((s1 == "ListenBacklog") && isnumber(s2.c_str()))
                 s2 >> c.ListenBacklog;
             else if ((s1 == "SendFile") && isbool(s2.c_str()))
-                s2 >> c.SEND_FILE;
+                c.SEND_FILE = (char)tolower(s2[0]);
             else if ((s1 == "SndBufSize") && isnumber(s2.c_str()))
                 s2 >> c.SNDBUF_SIZE;
             else if ((s1 == "MaxRequests") && isnumber(s2.c_str()))
@@ -277,7 +271,7 @@ void read_conf_file(const char *path_conf)
             else if ((s1 == "MaxRequestsPerThr") && isnumber(s2.c_str()))
                 s2 >> c.MaxRequestsPerThr;
             else if ((s1 == "KeepAlive") && isbool(s2.c_str()))
-                s2 >> c.KeepAlive;
+                c.KeepAlive = (char)tolower(s2[0]);
             else if ((s1 == "TimeoutKeepAlive") && isnumber(s2.c_str()))
                 s2 >> c.TimeoutKeepAlive;
             else if ((s1 == "TimeOut") && isnumber(s2.c_str()))
@@ -291,7 +285,7 @@ void read_conf_file(const char *path_conf)
             else if (s1 == "PathPHP")
                 s2 >> c.PathPHP;
             else if ((s1 == "ShowMediaFiles") && isbool(s2.c_str()))
-                s2 >> c.ShowMediaFiles;
+                c.ShowMediaFiles = (char)tolower(s2[0]);
             else if ((s1 == "ClientMaxBodySize") && isnumber(s2.c_str()))
                 s2 >> c.ClientMaxBodySize;
             else if (s1 == "User")
@@ -307,7 +301,7 @@ void read_conf_file(const char *path_conf)
             {
                 if (find_bracket(fconf) == 0)
                 {
-                    fprintf(stderr, "<%s:%d> Error Error not found \"{\"\n", __func__, __LINE__);
+                    fprintf(stderr, "<%s:%d> Error not found \"{\"\n", __func__, __LINE__);
                     exit(1);
                 }
 
@@ -322,13 +316,13 @@ void read_conf_file(const char *path_conf)
                     if (ss == "index.html")
                         c.index_html = 'y';
                     else if (ss == "index.php")
-                    c.index_php = 'y';
+                        c.index_php = 'y';
                     else if (ss == "index.pl")
                         c.index_pl = 'y';
                     else if (ss == "index.fcgi")
                         c.index_fcgi = 'y';
                     else
-                        fprintf(stderr, "<%s:%d> Error read conf file(): \"index\" [%s]\n", __func__, __LINE__, ss.c_str()), exit(1);
+                        fprintf(stderr, "<%s:%d> Error read config file: \"index\" [%s]\n", __func__, __LINE__, ss.c_str()), exit(1);
                 }
 
                 if (ss != "}")
@@ -341,7 +335,7 @@ void read_conf_file(const char *path_conf)
             {
                 if (find_bracket(fconf) == 0)
                 {
-                    fprintf(stderr, "<%s:%d> Error Error not found \"{\"\n", __func__, __LINE__);
+                    fprintf(stderr, "<%s:%d> Error not found \"{\"\n", __func__, __LINE__);
                     exit(1);
                 }
 
@@ -372,6 +366,9 @@ void read_conf_file(const char *path_conf)
             exit(1);
         }
     }
+
+    if (!feof(fconf))
+        fprintf(stderr, "<%s:%d> Error read config file\n", __func__, __LINE__), exit(1);
 
     fclose(fconf);
 

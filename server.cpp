@@ -30,15 +30,11 @@ pid_t create_child(int num_chld);
 int main(int argc, char *argv[])
 {
     if (argc == 1)
-        read_conf_file(".");
+        read_conf_file("./server.conf");
     else
         read_conf_file(argv[1]);
     
-    if (signal(SIGPIPE, SIG_IGN) == SIG_ERR)
-    {
-        fprintf(stderr, "<%s:%d> Error signal(SIGPIPE): %s\n", __func__, __LINE__, strerror(errno));
-        exit(EXIT_FAILURE);
-    }
+    signal(SIGPIPE, SIG_IGN);
 
     pid_t pid = getpid();
     //------------------------------------------------------------------
