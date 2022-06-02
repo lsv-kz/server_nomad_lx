@@ -93,7 +93,7 @@ int getLine(FILE *f, String &ss)
 
     while (((ch = getc(f)) != EOF))
     {
-        if ((char)ch == '\n')
+        if (ch == '\n')
         {
             if (len)
                 return ++numWords;
@@ -105,43 +105,37 @@ int getLine(FILE *f, String &ss)
                 continue;
             }
         }
-
-        if (wr == 0)
+        else if (wr == 0)
             continue;
-
-        switch (ch)
+        else if ((ch == ' ') || (ch == '\t'))
         {
-            case ' ':
-            case '\t':
-                if (len)
-                    wrSpace = 1;
-            case '\r':
-                break;
-            case '#':
-                wr = 0;
-                break;
-            case '{':
-            case '}':
-                if (len)
-                    fseek(f, -1, 1); // ungetc(ch, f);
-                else
-                {
-                    ss << (char)ch;
-                    ++len;
-                }
-                
-                return ++numWords;
-            default:
-                if (wrSpace)
-                {
-                    ss << " ";
-                    ++len;
-                    ++numWords;
-                    wrSpace = 0;
-                }
-                
+            if (len)
+                wrSpace = 1;
+        }
+        else if (ch == '#')
+            wr = 0;
+        else if ((ch == '{') || (ch == '}'))
+        {
+            if (len)
+                fseek(f, -1, 1);
+            else
+            {
                 ss << (char)ch;
                 ++len;
+            }
+            return ++numWords;
+        }
+        else if (ch != '\r')
+        {
+            if (wrSpace)
+            {
+                ss << " ";
+                ++len;
+                ++numWords;
+                wrSpace = 0;
+            }
+            ss << (char)ch;
+            ++len;
         }
     }
 
@@ -166,7 +160,7 @@ int isbool(const char *s)
         return 0;
     if (strlen(s) != 1)
         return 0;
-    return (((char)tolower(s[0]) == 'y') || ((char)tolower(s[0]) == 'n'));
+    return ((tolower(s[0]) == 'y') || (tolower(s[0]) == 'n'));
 }
 //======================================================================
 int find_bracket(FILE *f)

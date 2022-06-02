@@ -111,7 +111,7 @@ void send_message(Connect *req, const char *msg, const String *hdrs)
     if ((req->httpProt != HTTP09) && send_response_headers(req, hdrs))
         return;
 
-    if ((req->reqMethod == M_HEAD) || (req->resp.respStatus = RS204))
+    if ((req->reqMethod == M_HEAD) || (req->resp.respStatus == RS204))
         return;
 
     if (req->resp.respContentLength > 0)
