@@ -23,28 +23,34 @@ void response1(RequestManager *ReqMan)
         }
         //--------------------------------------------------------------
         get_time(req->resp.sLogTime);
-        int ret = parse_startline_request(req, req->arrHdrs[0].ptr, req->arrHdrs[0].len);
+        int ret = parse_startline_request(req, req->reqHdName[0]);
         if (ret)
         {
             print_err(req, "<%s:%d>  Error parse_startline_request(): %d\n", __func__, __LINE__, ret);
             goto end;
         }
      
-        for (int i = 1; i < req->i_arrHdrs; ++i)
+        for (int i = 1; i < req->countReqHeaders; ++i)
         {
-            ret = parse_headers(req, req->arrHdrs[i].ptr, req->arrHdrs[i].len);
+            ret = parse_headers(req, req->reqHdName[i], i);
             if (ret < 0)
             {
                 print_err(req, "<%s:%d>  Error parse_headers(): %d\n", __func__, __LINE__, ret);
                 goto end;
             }
         }
-        
+    #ifdef TCP_CORK_
         if (conf->tcp_cork == 'y')
         {
+            #if defined(LINUX_)
             int optval = 1;
             setsockopt(req->clientSocket, SOL_TCP, TCP_CORK, &optval, sizeof(optval));
+        #elif defined(FREEBSD_)
+            int optval = 1;
+            setsockopt(req->clientSocket, IPPROTO_TCP, TCP_NOPUSH, &optval, sizeof(optval));
+        #endif
         }
+    #endif
         //--------------------------------------------------------------
         if ((req->httpProt != HTTP10) && (req->httpProt != HTTP11))
         {
@@ -55,7 +61,7 @@ void response1(RequestManager *ReqMan)
 
         if (req->numReq >= (unsigned int)conf->MaxRequestsPerThr || (conf->KeepAlive == 'n') || (req->httpProt == HTTP10))
             req->connKeepAlive = 0;
-        else if (req->req_hdrs.iConnection == -1)
+        else if (req->req_hd.iConnection == -1)
             req->connKeepAlive = 1;
 
         if ((p = strchr(req->uri, '?')))
@@ -86,9 +92,9 @@ void response1(RequestManager *ReqMan)
             goto end;
         }
 
-        if (req->req_hdrs.iUpgrade >= 0)
+        if (req->req_hd.iUpgrade >= 0)
         {
-            print_err(req, "<%s:%d> req->upgrade: %s\n", __func__, __LINE__, req->req_hdrs.Value[req->req_hdrs.iUpgrade]);
+            print_err(req, "<%s:%d> req->upgrade: %s\n", __func__, __LINE__, req->reqHdValue[req->req_hd.iUpgrade]);
             req->connKeepAlive = 0;
             req->err = -RS505;
             goto end;
@@ -243,9 +249,11 @@ int response2(Connect *req)
 
     if (lstat(path.c_str(), &st) == -1)
     {
-    //    print_err(req, "<%s:%d> Error lstat(\"%s\"): %s\n", __func__, __LINE__, req->decodeUri, strerror(errno));
         if (errno == EACCES)
+        {
+			print_err(req, "<%s:%d> Error lstat(\"%s\"): %s\n", __func__, __LINE__, path.c_str(), strerror(errno));
             return -RS403;
+		}
         return fastcgi(req, req->decodeUri);
     }
     else
@@ -344,7 +352,9 @@ int response2(Connect *req)
             if (conf->AutoIndex == 'y')
                 return index_dir(req, path);
             else
+            {
                 return -RS403;
+			}
         }
     }
     
@@ -378,7 +388,7 @@ int response2(Connect *req)
 //======================================================================
 int send_file(Connect *req)
 {
-    if (req->req_hdrs.iRange >= 0)
+    if (req->req_hd.iRange >= 0)
     {
         int err;
         

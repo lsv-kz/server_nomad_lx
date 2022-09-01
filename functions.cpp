@@ -483,112 +483,134 @@ const char *base_name(const char *path)
     return path;
 }
 //======================================================================
-int parse_startline_request(Connect *req, char *s, int len)
+int parse_startline_request(Connect *req, char *s)
 {
-    char *p, tmp[16];
+    if (s == NULL)
+    {
+        print_err(req, "<%s:%d> Error: start line is empty\n",  __func__, __LINE__);
+        return -1;
+    }
     //----------------------------- method -----------------------------
-    p = tmp;
-    int i = 0, n = 0;
-    while ((i < len) && (n < (int)sizeof(tmp)))
+    if (s[0] == ' ')
+        return -1;
+    char *p = s, *p_val;
+    p_val = p;
+    while (*p)
     {
-        char ch = s[i++];
-        if ((ch != '\x20') && (ch != '\r') && (ch != '\n'))
-            p[n++] = ch;
-        else
+        if (*p == ' ')
+        {
+            *p = 0;
+            p++;
             break;
+        }
+        p++;
     }
-    p[n] = 0;
 
-    req->reqMethod = get_int_method(tmp);
-    if (!req->reqMethod) return -RS400;
+    req->reqMethod = get_int_method(p_val);
+    if (!req->reqMethod)
+        return -RS400;
     //------------------------------- uri ------------------------------
-    char ch = s[i];
-    if ((ch == '\x20') || (ch == '\r') || (ch == '\n'))
+    p_val = p;
+    while (*p)
     {
-        return -RS400;
-    }
-
-    req->uri = s + i;
-    while (i < len)
-    {
-        char ch = s[i];
-        if ((ch == '\x20') || (ch == '\r') || (ch == '\n') || (ch == 0))
+        if (*p == ' ')
+        {
+            *p = 0;
+            p++;
             break;
-        ++i;
+        }
+        p++;
     }
 
-    if (s[i] == '\r')// HTTP/0.9
-    {
-        req->httpProt = HTTP09;
-        s[i] = 0;
-        return 0;
-    }
-    
-    if (s[i] == '\x20')
-        s[i++] = 0;
-    else
-        return -RS400;
+    req->uri = p_val;
     //------------------------------ version ---------------------------
-    ch = s[i];
-    if ((ch == '\x20') || (ch == '\r') || (ch == '\n'))
-        return -RS400;
-
-    p = tmp;
-    n = 0;
-    while ((i < len) && (n < (int)sizeof(tmp)))
+    p_val = p;
+    /*while (*p)
     {
-        char ch = s[i++];
-        if ((ch != '\x20') && (ch != '\r') && (ch != '\n'))
-            p[n++] = ch;
-        else
+        if (*p == ' ')
+        {
+            *p = 0;
+            p++;
             break;
-    }
-    p[n] = 0;
-    
-    if(!(req->httpProt = get_int_http_prot(tmp)))
+        }
+        p++;
+    }*/
+
+    if(!(req->httpProt = get_int_http_prot(p_val)))
     {
         print_err(req, "<%s:%d> Error version protocol\n", __func__, __LINE__);
         req->httpProt = HTTP11;
         return -RS400;
     }
-
     return 0;
 }
 //======================================================================
-int parse_headers(Connect *req, char *s, int len)
+int parse_headers(Connect *req, char *pName, int i)
 {
-    if (req->req_hdrs.countReqHeaders >= MAX_HEADERS)
-        return -RS500;
-    int n;
-    char *pName = s, *pVal, *p;
-
-    p = (char*)memchr(pName, '\r', len);
-    if (!p) return -1;
-    *p = 0;
-    
-    if(!(p = (char*)memchr(pName, ':', len)))
+    if (pName == NULL)
     {
-        print_err(req, "<%s:%d> Error: ':' not found\n", __func__, __LINE__);
-        return -RS400;
+        print_err(req, "<%s:%d> Error: header is empty\n",  __func__, __LINE__);
+        return -1;
     }
-    *(++p) = 0;
-
-    n = strspn(p + 1, "\x20");
-    pVal = p + 1 + n;
     
-    if(!strlcmp_case(pName, "connection:", 11))
+    if (req->httpProt == HTTP09)
     {
-        req->req_hdrs.iConnection = req->req_hdrs.countReqHeaders;
-        if(strstr_case(pVal, "keep-alive"))
+        print_err(req, "<%s:%d> Error version protocol\n", __func__, __LINE__);
+        return -1;
+    }
+
+    char *pVal, *p = pName, ch;
+    int colon = 0;
+    while ((ch = *p))
+    {
+        if (ch == ':')
+            colon = 1;
+        else if ((ch == ' ') || (ch == '\t') || (ch == '\n') || (ch == '\r'))
+        {
+            if (colon == 0)
+                return -RS400;
+            *(p++) = 0;
+            break;
+        }
+        else
+            *p = tolower(ch);
+        p++;
+    }
+
+    if (*p == ' ')
+        return -RS400;
+    pVal = p;
+
+    if (!strcmp(pName, "accept-encoding:"))
+    {
+        req->req_hd.iAcceptEncoding = i;
+    }
+    else if (!strcmp(pName, "connection:"))
+    {
+        req->req_hd.iConnection = i;
+        if (strstr_case(pVal, "keep-alive"))
             req->connKeepAlive = 1;
         else
             req->connKeepAlive = 0;
     }
-    else if(!strlcmp_case(pName, "host:", 5))
+    else if (!strcmp(pName, "content-length:"))
     {
-        req->req_hdrs.iHost = req->req_hdrs.countReqHeaders;
+        req->req_hd.reqContentLength = atoll(pVal);
+        req->req_hd.iReqContentLength = i;
     }
-    else if(!strlcmp_case(pName, "range:", 6))
+    else if (!strcmp(pName, "content-type:"))
+    {
+        req->req_hd.iReqContentType = i;
+    }
+    else if (!strcmp(pName, "host:"))
+    {
+        req->req_hd.iHost = i;
+    }
+    else if (!strcmp(pName, "if-range:"))
+    {
+        req->req_hd.iIfRange = i;
+    }
+    else if (!strcmp(pName, "range:"))
     {
         char *p = strchr(pVal, '=');
         if (p)
@@ -596,40 +618,22 @@ int parse_headers(Connect *req, char *s, int len)
         else
             req->sRange = NULL;
         
-        req->req_hdrs.iRange = req->req_hdrs.countReqHeaders;
+        req->req_hd.iRange = i;
     }
-    else if(!strlcmp_case(pName, "If-Range:", 9))
+    else if (!strcmp(pName, "referer:"))
     {
-        req->req_hdrs.iIfRange = req->req_hdrs.countReqHeaders;
+        req->req_hd.iReferer = i;
     }
-    else if(!strlcmp_case(pName, "referer:", 8))
+    else if (!strcmp(pName, "upgrade:"))
     {
-        req->req_hdrs.iReferer = req->req_hdrs.countReqHeaders;
+        req->req_hd.iUpgrade = i;
     }
-    else if(!strlcmp_case(pName, "user-agent:", 11))
+    else if (!strcmp(pName, "user-agent:"))
     {
-        req->req_hdrs.iUserAgent = req->req_hdrs.countReqHeaders;
-    }
-    else if(!strlcmp_case(pName, "upgrade:", 8))
-    {
-        req->req_hdrs.iUpgrade = req->req_hdrs.countReqHeaders;
-    }
-    else if(!strlcmp_case(pName, "content-length:", 15))
-    {
-        req->req_hdrs.reqContentLength = atoll(pVal);
-        req->req_hdrs.iReqContentLength = req->req_hdrs.countReqHeaders;
-    }
-    else if(!strlcmp_case(pName, "content-type:", 13))
-    {
-        req->req_hdrs.iReqContentType = req->req_hdrs.countReqHeaders;
-    }
-    else if(!strlcmp_case(pName, "accept-encoding:", 16))
-    {
-        req->req_hdrs.iAcceptEncoding = req->req_hdrs.countReqHeaders;
+        req->req_hd.iUserAgent = i;
     }
 
-    req->req_hdrs.Name[req->req_hdrs.countReqHeaders] = pName;
-    req->req_hdrs.Value[req->req_hdrs.countReqHeaders++] = pVal;
+    req->reqHdValue[i] = pVal;
 
     return 0;
 }

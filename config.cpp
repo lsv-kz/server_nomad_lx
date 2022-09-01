@@ -44,33 +44,36 @@ void create_conf_file(const char *path)
         exit(1);
     }
 
-    fprintf(f, "ServerSoftware   %s\n", c.ServerSoftware.c_str());
-    fprintf(f, "ServerAddr   %s\n", c.host.c_str());
-    fprintf(f, "Port         %s\n", c.servPort.c_str());
-    fprintf(f, "tcp_cork   %c\n", c.tcp_cork);
+    fprintf(f, "ServerSoftware   ?\n");
+    fprintf(f, "ServerAddr   0.0.0.0\n");
+    fprintf(f, "Port         20000\n");
+    fprintf(f, "tcp_cork   n # y/n\n");
     fprintf(f, "TcpNoDelay   y\n");
-    fprintf(f, "DocumentRoot %s\n", c.rootDir.c_str());
-    fprintf(f, "ScriptPath   %s\n", c.cgiDir.c_str());
-    fprintf(f, "LogPath      %s\n", c.logDir.c_str());
-    fprintf(f, "MaxRequestsPerThr %d\n", c.MaxRequestsPerThr);
-    fprintf(f, "ListenBacklog %d\n", c.ListenBacklog);
-    fprintf(f, "SndBufSize   %d\n", c.SNDBUF_SIZE);
-    fprintf(f, "MaxRequests %d\n", c.MAX_REQUESTS);
-    fprintf(f, "SendFile  %c\n", c.SEND_FILE);
-    fprintf(f, "TimeoutPoll  %d\n", c.TIMEOUT_POLL);
-    fprintf(f, "NumProc %d\n", c.NumProc);
-    fprintf(f, "MaxThreads %d\n", c.MaxThreads);
-    fprintf(f, "MinThreads %d\n", c.MinThreads);
-    fprintf(f, "MaxCgiProc %d\n", c.MaxCgiProc);
-    fprintf(f, "KeepAlive  %c   #  y/n\n", c.KeepAlive);
-    fprintf(f, "TimeoutKeepAlive %d\n", c.TimeoutKeepAlive);
-    fprintf(f, "TimeOut    %d\n", c.TimeOut);
-    fprintf(f, "TimeoutCGI %d\n\n", c.TimeoutCGI);
-    fprintf(f, "MaxRanges  %d\n\n", c.MaxRanges);
-    fprintf(f, "ClientMaxBodySize %ld\n", c.ClientMaxBodySize);
+    fprintf(f, "DocumentRoot www/html\n");
+    fprintf(f, "ScriptPath   www/cgi-bin\n");
+    fprintf(f, "LogPath      www/logsn");
+    fprintf(f, "MaxRequestsPerThr 10000\n");
+    fprintf(f, "ListenBacklog 128\n");
+    fprintf(f, "SndBufSize   32768\n");
+    fprintf(f, "SendFileSizePart  32768\n");
+    fprintf(f, "MaxRequests 768\n");
+    fprintf(f, "MaxEventSock      100\n");
+    fprintf(f, "SendFile  y\n");
+    fprintf(f, "TimeoutPoll  100\n");
+    fprintf(f, "NumProc 1\n");
+    fprintf(f, "MaxThreads 300\n");
+    fprintf(f, "MinThreads 6\n");
+    fprintf(f, "MaxCgiProc 15\n");
+    fprintf(f, "KeepAlive  y   #  y/n\n");
+    fprintf(f, "TimeoutKeepAlive 15\n");
+    fprintf(f, "TimeOut    120\n");
+    fprintf(f, "TimeoutCGI 15\n\n");
+    fprintf(f, "MaxRanges  5\n\n");
+    fprintf(f, "ClientMaxBodySize 10000000\n");
     fprintf(f, " UsePHP     n  # php-fpm # php-cgi \n");
     fprintf(f, "# PathPHP   /usr/bin/php-cgi\n");
     fprintf(f, "# PathPHP  127.0.0.1:9000  #  /run/php/php7.0-fpm.sock \n\n");
+    fprintf(f, "AutoIndex   n\n");
     fprintf(f, "index {\n"
                 "\t#index.html\n"
                 "}\n\n");
@@ -79,7 +82,7 @@ void create_conf_file(const char *path)
                 "\t#/test  127.0.0.1:9009\n"
                 "}\n\n");
 
-    fprintf(f, "ShowMediaFiles %c #  y/n\n", c.ShowMediaFiles);
+    fprintf(f, "ShowMediaFiles  y #  y/n\n");
     fprintf(f, "User nobody     # www-data\n");
     fprintf(f, "Group nogroup   # www-data\n\n");
 
@@ -144,7 +147,7 @@ int getLine(FILE *f, String &ss)
     return -1;
 }
 //======================================================================
-int isnumber(const char *s)
+int is_number(const char *s)
 {
     if (!s)
         return 0;
@@ -154,7 +157,7 @@ int isnumber(const char *s)
     return n;
 }
 //======================================================================
-int isbool(const char *s)
+int is_bool(const char *s)
 {
     if (!s)
         return 0;
@@ -234,19 +237,23 @@ void read_conf_file(const char *path_conf)
                 s2 >> c.servPort;
             else if (s1 == "ServerSoftware")
                 s2 >> c.ServerSoftware;
-            else if ((s1 == "tcp_cork") && isbool(s2.c_str()))
+            else if ((s1 == "tcp_cork") && is_bool(s2.c_str()))
                 c.tcp_cork = (char)tolower(s2[0]);
-            else if ((s1 == "TcpNoDelay") && isbool(s2.c_str()))
+            else if ((s1 == "TcpNoDelay") && is_bool(s2.c_str()))
                 c.TcpNoDelay = (char)tolower(s2[0]);
-            else if ((s1 == "ListenBacklog") && isnumber(s2.c_str()))
+            else if ((s1 == "ListenBacklog") && is_number(s2.c_str()))
                 s2 >> c.ListenBacklog;
-            else if ((s1 == "SendFile") && isbool(s2.c_str()))
+            else if ((s1 == "SendFile") && is_bool(s2.c_str()))
                 c.SEND_FILE = (char)tolower(s2[0]);
-            else if ((s1 == "SndBufSize") && isnumber(s2.c_str()))
+            else if ((s1 == "SndBufSize") && is_number(s2.c_str()))
                 s2 >> c.SNDBUF_SIZE;
-            else if ((s1 == "MaxRequests") && isnumber(s2.c_str()))
+            else if ((s1 == "SendFileSizePart") && is_number(s2.c_str()))
+                s2 >> c.SEND_FILE_SIZE_PART;
+            else if ((s1 == "MaxRequests") && is_number(s2.c_str()))
                 s2 >> c.MAX_REQUESTS;
-            else if ((s1 == "TimeoutPoll") && isnumber(s2.c_str()))
+            else if ((s1 == "MaxEventSock") && is_number(s2.c_str()))
+                s2 >> c.MAX_EVENT_SOCK;
+            else if ((s1 == "TimeoutPoll") && is_number(s2.c_str()))
                 s2 >> c.TIMEOUT_POLL;
             else if (s1 == "DocumentRoot")
                 s2 >> c.rootDir;
@@ -254,38 +261,40 @@ void read_conf_file(const char *path_conf)
                 s2 >> c.cgiDir;
             else if (s1 == "LogPath")
                 s2 >> c.logDir;
-            else if ((s1 == "NumProc") && isnumber(s2.c_str()))
+            else if ((s1 == "NumProc") && is_number(s2.c_str()))
                 s2 >> c.NumProc;
-            else if ((s1 == "MaxThreads") && isnumber(s2.c_str()))
+            else if ((s1 == "MaxThreads") && is_number(s2.c_str()))
                 s2 >> c.MaxThreads;
-            else if ((s1 == "MinThreads") && isnumber(s2.c_str()))
+            else if ((s1 == "MinThreads") && is_number(s2.c_str()))
                 s2 >> c.MinThreads;
-            else if ((s1 == "MaxCgiProc") && isnumber(s2.c_str()))
+            else if ((s1 == "MaxCgiProc") && is_number(s2.c_str()))
                 s2 >> c.MaxCgiProc;
-            else if ((s1 == "MaxRequestsPerThr") && isnumber(s2.c_str()))
+            else if ((s1 == "MaxRequestsPerThr") && is_number(s2.c_str()))
                 s2 >> c.MaxRequestsPerThr;
-            else if ((s1 == "KeepAlive") && isbool(s2.c_str()))
+            else if ((s1 == "KeepAlive") && is_bool(s2.c_str()))
                 c.KeepAlive = (char)tolower(s2[0]);
-            else if ((s1 == "TimeoutKeepAlive") && isnumber(s2.c_str()))
+            else if ((s1 == "TimeoutKeepAlive") && is_number(s2.c_str()))
                 s2 >> c.TimeoutKeepAlive;
-            else if ((s1 == "TimeOut") && isnumber(s2.c_str()))
+            else if ((s1 == "TimeOut") && is_number(s2.c_str()))
                 s2 >> c.TimeOut;
-            else if ((s1 == "TimeoutCGI") && isnumber(s2.c_str()))
+            else if ((s1 == "TimeoutCGI") && is_number(s2.c_str()))
                 s2 >> c.TimeoutCGI;
-            else if ((s1 == "MaxRanges") && isnumber(s2.c_str()))
+            else if ((s1 == "MaxRanges") && is_number(s2.c_str()))
                 s2 >> c.MaxRanges;
             else if (s1 == "UsePHP")
                 s2 >> c.UsePHP;
             else if (s1 == "PathPHP")
                 s2 >> c.PathPHP;
-            else if ((s1 == "ShowMediaFiles") && isbool(s2.c_str()))
+            else if ((s1 == "ShowMediaFiles") && is_bool(s2.c_str()))
                 c.ShowMediaFiles = (char)tolower(s2[0]);
-            else if ((s1 == "ClientMaxBodySize") && isnumber(s2.c_str()))
+            else if ((s1 == "ClientMaxBodySize") && is_number(s2.c_str()))
                 s2 >> c.ClientMaxBodySize;
             else if (s1 == "User")
                 s2 >> c.user;
             else if (s1 == "Group")
                 s2 >> c.group;
+            else if ((s1 == "AutoIndex") && is_bool(s2.c_str()))
+                s2 >> c.AutoIndex;
             else
                 fprintf(stderr, "<%s:%d> Error read config file: [%s]\n", __func__, __LINE__, ss.c_str()), exit(1);
         }

@@ -1,10 +1,10 @@
-CFLAGS = -Wall -O2 -g -std=c++11  -fno-inline
+CFLAGS = -Wall -O2 -g -std=c++11
 
 CC = c++
-#CC = clang++
+#CC = clang++  -fno-inline
 
 OBJSDIR = objs
-$(shell mkdir -p $(OBJSDIR))
+#$(shell mkdir -p $(OBJSDIR))
 
 OBJS = $(OBJSDIR)/server.o \
 	$(OBJSDIR)/classes.o \

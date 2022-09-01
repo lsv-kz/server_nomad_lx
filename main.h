@@ -40,6 +40,11 @@
 
 #include "String.h"
 
+#define    LINUX_ 
+//#define    FREEBSD_ 
+#define    SEND_FILE_
+#define    TCP_CORK_
+
 #define     MAX_PATH          2048
 #define     MAX_NAME           256
 #define     LEN_BUF_REQUEST   8192
@@ -77,51 +82,65 @@ void print_err(const char *format, ...);
 //----------------------------------------------------------------------
 struct Config
 {
-    String host = "0.0.0.0";
-    String ServerSoftware = "x";
-    String servPort = "20000";
-    char tcp_cork = 'n';
-    char TcpNoDelay = 'y';
-    int NumProc = 1;
-    int MaxThreads = 15;
-    int MinThreads = 6;
-    int MaxRequestsPerThr = 50;
-    int MaxCgiProc = 5;
-    int ListenBacklog = 128;
-    int SNDBUF_SIZE = 16284;
-    int TIMEOUT_POLL = 10;
-    char SEND_FILE = 'n';
-    int MAX_REQUESTS = 256;
-    char KeepAlive = 'y';
-    int TimeoutKeepAlive = 5;
-    int TimeOut = 30;
-    int TimeoutCGI = 5;
-    int MaxRanges = 5;
+    String ServerSoftware;
 
-    String rootDir = "";
-    String cgiDir = "";
-    String logDir = "";
+    String host;
+    String servPort;
 
-    long int ClientMaxBodySize = 1000000;
+    String rootDir;
+    String cgiDir;
+    String logDir;
 
-    String UsePHP = "n";
-    String PathPHP = "";
+    String UsePHP;
+    String PathPHP;
 
-    char AutoIndex = 'y';
-    char index_html = 'n';
-    char index_php = 'n';
-    char index_pl = 'n';
-    char index_fcgi = 'n';
+    int ListenBacklog;
+    char tcp_cork;
+    char TcpNoDelay;
+    int NumProc;
 
-    char ShowMediaFiles = 'n';
+    char SEND_FILE;
+    long SEND_FILE_SIZE_PART;
+    int SNDBUF_SIZE;
+
+    int MAX_REQUESTS;
+    int MAX_EVENT_SOCK;
+    
+    int MaxThreads;
+    int MinThreads;
+    int MaxRequestsPerThr;
+    int MaxCgiProc;
+
+    int MaxRanges;
+    long int ClientMaxBodySize;
+
+    char KeepAlive;
+    int TimeoutKeepAlive;
+    int TimeOut;
+    int TIMEOUT_POLL;
+    int TimeoutCGI;
+
+    char AutoIndex;
+    char index_html;
+    char index_php;
+    char index_pl;
+    char index_fcgi;
+
+    char ShowMediaFiles;
+
+    String user;
+    String group;
 
     uid_t server_uid;
     gid_t server_gid;
-    
-    String user = "";
-    String group = "";
 
     fcgi_list_addr *fcgi_list;
+    //------------------------------------------------------------------
+    Config()
+    {
+        fcgi_list = NULL;
+    }
+
     ~Config()
     {
         fcgi_list_addr *t;
@@ -138,37 +157,30 @@ struct Config
 //----------------------------------------------------------------------
 extern const Config* const conf;
 //======================================================================
-struct hdr {
-    char *ptr;
-    int len;
-};
-
 class Connect
 {
 public:
     Connect *prev;
     Connect *next;
     static int serverSocket;
-    
+
     unsigned int numProc, numConn, numReq;
     int       clientSocket;
     int       err;
     time_t    sock_timer;
     int       timeout;
     int       event;
-    
+
     char      remoteAddr[NI_MAXHOST];
     char      remotePort[NI_MAXSERV];
-    
+
     char      bufReq[LEN_BUF_REQUEST];
-    
+
     int       i_bufReq;
     char      *p_newline;
     char      *tail;
     int       lenTail;
-    int       i_arrHdrs;
-    hdr       arrHdrs[MAX_HEADERS + 1];
-    
+
     char      decodeUri[LEN_BUF_REQUEST];
     unsigned int lenDecodeUri;
 
@@ -182,7 +194,8 @@ public:
     int       httpProt;
     int       connKeepAlive;
     
-    struct  {
+    struct
+    {
         int  iConnection;
         int  iHost;
         int  iUserAgent;
@@ -193,13 +206,12 @@ public:
         int  iAcceptEncoding;
         int  iRange;
         int  iIfRange;
-        
         long long reqContentLength;
-        
-        int       countReqHeaders;
-        const char      *Name[MAX_HEADERS + 1];
-        const char      *Value[MAX_HEADERS + 1];
-    } req_hdrs;
+    } req_hd;
+    
+    int  countReqHeaders;
+    char  *reqHdName[MAX_HEADERS + 1];
+    const char  *reqHdValue[MAX_HEADERS + 1];
     //--------------------------------------
     struct {
         int       respStatus;
@@ -309,8 +321,8 @@ int clean_path(char *path);
 const char *content_type(const char *s);
 
 const char *base_name(const char *path);
-int parse_startline_request(Connect *req, char *s, int len);
-int parse_headers(Connect *req, char *s, int len);
+int parse_startline_request(Connect *req, char *s);
+int parse_headers(Connect *req, char *s, int n);
 const char *str_err(int i);
 //----------------------------------------------------------------------
 void create_logfiles(const String &, const String &);

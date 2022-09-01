@@ -55,6 +55,7 @@ int main(int argc, char *argv[])
          << "\n   SndBufSize = " << conf->SNDBUF_SIZE
          << "\n   SendFile = " << conf->SEND_FILE
          << "\n   MaxRequests = " << conf->MAX_REQUESTS
+         << "\n   MaxEventSock = " << conf->MAX_EVENT_SOCK
          
          << "\n\n   NumProc = " << conf->NumProc
          << "\n   MaxThreads = " << conf->MaxThreads

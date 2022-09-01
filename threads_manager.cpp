@@ -172,12 +172,18 @@ void end_response(Connect *req)
     }
     else
     { // ----- KeepAlive -----
+    #ifdef TCP_CORK_
         if (conf->tcp_cork == 'y')
         {
+        #if defined(LINUX_)
             int optval = 0;
             setsockopt(req->clientSocket, SOL_TCP, TCP_CORK, &optval, sizeof(optval));
+        #elif defined(FREEBSD_)
+            int optval = 0;
+            setsockopt(req->clientSocket, IPPROTO_TCP, TCP_NOPUSH, &optval, sizeof(optval));
+        #endif
         }
-        
+    #endif
         print_log(req);
         req->timeout = conf->TimeoutKeepAlive;
         ++req->numReq;

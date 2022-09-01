@@ -12,12 +12,12 @@ void Connect::init()
     err = 0;
     lenTail = 0;
     i_bufReq = 0;
-    i_arrHdrs = 0;
+    countReqHeaders = 0;
     reqMethod = 0;
     httpProt = 0;
     connKeepAlive = 0;
 
-    req_hdrs = {-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1LL,0};
+    req_hd = {-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1LL};
 
     resp.fd = -1;
     resp.respStatus = 0;
@@ -43,14 +43,12 @@ int Connect::hd_read()
         return NO_PRINT_LOG;
 
     lenTail += n;
-
     i_bufReq += n;
     bufReq[i_bufReq] = 0;
 
     n = empty_line();
     if (n == 1)
     {
-        timeout = conf->TimeOut;
         return i_bufReq;
     }
     else if (n < 0)
@@ -58,52 +56,78 @@ int Connect::hd_read()
 
     return 0;
 }
-    
+
 int Connect::empty_line()
 {
     if (err) return -1;
     timeout = conf->TimeOut;
-    char *pr, *pn;
+    char *pr, *pn, ch;
     while (lenTail > 0)
     {
-        pr = (char*)memchr(p_newline, '\r', lenTail - 1);
-        pn = (char*)memchr(p_newline, '\n', lenTail);
-        if (pr && pn)
+        int i = 0, len_line = 0;
+        pr = pn = NULL;
+        while (i < lenTail)
         {
-            if ((pn - pr) != 1)
-                return -RS400;
-
-            if ((pn - p_newline) == 1)
+            ch = *(p_newline + i);
+            if (ch == '\r')
             {
-                lenTail -= (pn+1 - p_newline);
-                if (lenTail > 0)
-                    tail = pn + 1;
-                else
+                if (i == (lenTail - 1))
+                    return 0;
+                pr = p_newline + i;
+            }
+            else if (ch == '\n')
+            {
+                pn = p_newline + i;
+                if ((pr) && ((pn - pr) != 1))
+                    return -RS400;
+                i++;
+                break;
+            }
+            else
+                len_line++;
+            i++;
+        }
+
+        if (pn)
+        {
+            if (pr == NULL)
+                *pn = 0;
+            else
+                *pr = 0;
+
+            if (len_line == 0)
+            {
+                if (countReqHeaders == 0)
                 {
-                    tail = NULL;
-                    lenTail = 0;
+                    if ((pn - bufReq + 1) > 4)
+                        return -RS400;
+                    lenTail -= i;
+                    p_newline = pn + 1;
+                    continue;
                 }
 
+                if (lenTail > 0)
+                {
+                    tail = pn + 1;
+                    lenTail -= i;
+                }
+                else 
+                    tail = NULL;
                 return 1;
             }
 
-            if (i_arrHdrs < MAX_HEADERS)
+            if (countReqHeaders < MAX_HEADERS)
             {
-                arrHdrs[i_arrHdrs].ptr = p_newline;
-                arrHdrs[i_arrHdrs].len = pn - p_newline + 1;
-                ++i_arrHdrs;
+                reqHdName[countReqHeaders] = p_newline;
+                countReqHeaders++;
             }
             else
-            {
                 return -RS500;
-            }
 
-            lenTail -= (pn + 1 - p_newline);
+            lenTail -= i;
             p_newline = pn + 1;
         }
         else if (pr && (!pn))
-            return -RS400;
-        else if ((!pr) && pn)
             return -RS400;
         else
             break;
@@ -215,7 +239,7 @@ void ArrayRanges::parse_ranges(char *sRange)
                     end = ll;
                 else
                 {
-                    err = 416;
+                    err = RS416;
                     return;
                 }
                             
@@ -239,13 +263,13 @@ void ArrayRanges::parse_ranges(char *sRange)
                 }
                 else
                 {
-                    err = 416;
+                    err = RS416;
                     return;
                 }
             }
             else if (i == 2)
             {
-                err = 416;
+                err = RS416;
                 return;
             }
             else
@@ -254,13 +278,13 @@ void ArrayRanges::parse_ranges(char *sRange)
                 i++;
             }
         }
-        else if (*p1 == ',')
+        else if ((*p1 == ',') || (*p1 == 0))
         {
             if (i == 2)
                 end = size - 1;
             else if (i != 3)
             {
-                err = 416;
+                err = RS416;
                 return;
             }
             
@@ -268,34 +292,23 @@ void ArrayRanges::parse_ranges(char *sRange)
                 end = size - 1;
             
             if (start <= end)
-                (*this) << Range{start, end, end - start + 1};
-            
-            start = end = 0;
-            p1++;
-            i = 0;
-        }
-        else if (*p1 == 0)
-        {
-            if (i == 2)
-                end = size - 1;
-            else if (i != 3)
             {
-                err = 416;
+                (*this) << Range{start, end, end - start + 1};
+                if (*p1 == 0)
+                    break;
+                start = end = 0;
+                p1++;
+                i = 0;
+            }
+            else
+            {
+                err =  RS416;
                 return;
             }
-            
-            if (end >= size)
-                end = size - 1;
-            
-            if (start <= end)
-                (*this) << Range{start, end, end - start + 1};
-            
-            start = end = 0;
-            break;
         }
         else
         {
-            err = 416;
+            err = RS416;
             return;
         }
     }
@@ -329,7 +342,7 @@ ArrayRanges::ArrayRanges(char *s, long long sz)
     sizeFile = sz;
     parse_ranges(s);
     if ((nRanges == 0) && (err == 0))
-        err = 416;
+        err = RS416;
     //else if (nRanges > 1)
     //    check_ranges();
 }

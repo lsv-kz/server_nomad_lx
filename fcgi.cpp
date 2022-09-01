@@ -107,13 +107,13 @@ int fcgi_(Connect *req, int fcgi_sock, FCGI_client & Fcgi)
                 return -RS502;
             }
             
-            req->req_hdrs.reqContentLength -= req->lenTail;
+            req->req_hd.reqContentLength -= req->lenTail;
         }
 
-        while (req->req_hdrs.reqContentLength > 0)
+        while (req->req_hd.reqContentLength > 0)
         {
             char buf[4096];
-            int rd = (req->req_hdrs.reqContentLength > (long long)sizeof(buf)) ? sizeof(buf) : (int)req->req_hdrs.reqContentLength;
+            int rd = (req->req_hd.reqContentLength > (long long)sizeof(buf)) ? sizeof(buf) : (int)req->req_hd.reqContentLength;
             int ret = read_timeout(req->clientSocket, buf, rd, conf->TimeOut);
             if (ret < 0)
             {
@@ -127,7 +127,7 @@ int fcgi_(Connect *req, int fcgi_sock, FCGI_client & Fcgi)
                 return -RS502;
             }
             
-            req->req_hdrs.reqContentLength -= ret;
+            req->req_hd.reqContentLength -= ret;
         }
     }
 
@@ -250,14 +250,14 @@ int fcgi_send_param(Connect *req, int fcgi_sock)
     
     Fcgi.add("SERVER_PROTOCOL", get_str_http_prot(req->httpProt));
     
-    if(req->req_hdrs.iHost >= 0)
-        Fcgi.add("HTTP_HOST", req->req_hdrs.Value[req->req_hdrs.iHost]);
+    if(req->req_hd.iHost >= 0)
+        Fcgi.add("HTTP_HOST", req->reqHdValue[req->req_hd.iHost]);
     
-    if(req->req_hdrs.iReferer >= 0)
-        Fcgi.add("HTTP_REFERER", req->req_hdrs.Value[req->req_hdrs.iReferer]);
+    if(req->req_hd.iReferer >= 0)
+        Fcgi.add("HTTP_REFERER", req->reqHdValue[req->req_hd.iReferer]);
     
-    if(req->req_hdrs.iUserAgent >= 0)
-        Fcgi.add("HTTP_USER_AGENT", req->req_hdrs.Value[req->req_hdrs.iUserAgent]);
+    if(req->req_hd.iUserAgent >= 0)
+        Fcgi.add("HTTP_USER_AGENT", req->reqHdValue[req->req_hd.iUserAgent]);
 
     Fcgi.add("SCRIPT_NAME", req->decodeUri);
     
@@ -270,15 +270,15 @@ int fcgi_send_param(Connect *req, int fcgi_sock)
 
     if(req->reqMethod == M_POST)
     {
-        if(req->req_hdrs.iReqContentType >= 0)
+        if(req->req_hd.iReqContentType >= 0)
         {
-            Fcgi.add("CONTENT_TYPE", req->req_hdrs.Value[req->req_hdrs.iReqContentType]);
-            print_err(req, "<%s:%d> %s\n", __func__, __LINE__, req->req_hdrs.Value[req->req_hdrs.iReqContentType]);
+            Fcgi.add("CONTENT_TYPE", req->reqHdValue[req->req_hd.iReqContentType]);
+            print_err(req, "<%s:%d> %s\n", __func__, __LINE__, req->reqHdValue[req->req_hd.iReqContentType]);
         }
         
-        if(req->req_hdrs.iReqContentLength >= 0)
+        if(req->req_hd.iReqContentLength >= 0)
         {
-            Fcgi.add("CONTENT_LENGTH", req->req_hdrs.Value[req->req_hdrs.iReqContentLength]);
+            Fcgi.add("CONTENT_LENGTH", req->reqHdValue[req->req_hd.iReqContentLength]);
         }
     }
     
@@ -302,27 +302,27 @@ int fcgi(Connect *req)
 
     if (req->reqMethod == M_POST)
     {
-        if (req->req_hdrs.iReqContentType < 0)
+        if (req->req_hd.iReqContentType < 0)
         {
             print_err(req, "<%s:%d> Content-Type \?\n", __func__, __LINE__);
             return -RS400;
         }
 
-        if (req->req_hdrs.reqContentLength < 0)
+        if (req->req_hd.reqContentLength < 0)
         {
             print_err(req, "<%s:%d> 411 Length Required\n", __func__, __LINE__);
             return -RS411;
         }
 
-        if (req->req_hdrs.reqContentLength > conf->ClientMaxBodySize)
+        if (req->req_hd.reqContentLength > conf->ClientMaxBodySize)
         {
-            print_err(req, "<%s:%d> 413 Request entity too large: %lld\n", __func__, __LINE__, req->req_hdrs.reqContentLength);
-            if (req->req_hdrs.reqContentLength < 50000000)
+            print_err(req, "<%s:%d> 413 Request entity too large: %lld\n", __func__, __LINE__, req->req_hd.reqContentLength);
+            if (req->req_hd.reqContentLength < 50000000)
             {
                 if (req->tail)
-                    req->req_hdrs.reqContentLength -= req->lenTail;
-                client_to_cosmos(req, &req->req_hdrs.reqContentLength);
-                if (req->req_hdrs.reqContentLength == 0)
+                    req->req_hd.reqContentLength -= req->lenTail;
+                client_to_cosmos(req, &req->req_hd.reqContentLength);
+                if (req->req_hd.reqContentLength == 0)
                     return -RS413;
             }
             return -1;

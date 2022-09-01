@@ -5,7 +5,6 @@ using namespace std;
 
 int flog, flog_err;
 mutex mtxLog;
-int get_len_queue(int *num_thr);
 //======================================================================
 void create_logfiles(const String & log_dir, const String& ServerSoftware)
 {
@@ -19,12 +18,7 @@ void create_logfiles(const String & log_dir, const String& ServerSoftware)
 
     String fileName;
     fileName.reserve(log_dir.size() + strlen(buf) + ServerSoftware.size() + 16);
-    fileName << log_dir;
-    fileName << '/';
-    fileName << buf;
-    fileName << '-';
-    fileName << ServerSoftware;
-    fileName << ".log";
+    fileName << log_dir << '/' << buf << '-' << ServerSoftware << ".log";
 
     flog = open(fileName.c_str(), O_CREAT | O_TRUNC | O_WRONLY, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
     if(flog == -1)
@@ -32,37 +26,34 @@ void create_logfiles(const String & log_dir, const String& ServerSoftware)
         cerr << "  Error create log: " << fileName.c_str() << "\n";
         exit(1);
     }
-    
+/*
     struct flock flck;
     flck.l_type = F_WRLCK;
     flck.l_whence = SEEK_SET;
     flck.l_start = 0;
     flck.l_len = 0;
     fcntl(flog, F_SETLK, &flck);
-/*
+
     flock(flog, LOCK_SH); //   LOCK_EX
 */  
 //   lockf(flog, F_LOCK, 0);
     //------------------------------------------------------------------
     fileName.clear();
-    fileName << log_dir;
-    fileName << "/";
-    fileName << ServerSoftware;
-    fileName << "-error.log";
+    fileName << log_dir << "/" << ServerSoftware << "-error.log";
     
-    flog_err = open(fileName.c_str(), O_CREAT | O_APPEND | O_WRONLY, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH); // O_TRUNC
+    flog_err = open(fileName.c_str(), O_CREAT | O_TRUNC | O_WRONLY, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH); //   O_APPEND 
     if(flog_err == -1)
     {
         cerr << "  Error create log_err: " << fileName.c_str() << "\n";
         exit(1);
     }
-    
+/*
     flck.l_type = F_WRLCK;
     flck.l_whence = SEEK_SET;
     flck.l_start = 0;
     flck.l_len = 0;
     fcntl(flog_err, F_SETLK, &flck);
-/*
+
     flock(flog_err, LOCK_SH); //   LOCK_EX
 */  
 //   lockf(flog_err, F_LOCK, 0);
@@ -110,21 +101,16 @@ mtxLog.unlock();
 void print_log(Connect *req)
 {
     String ss(320);
-        
-    ss << req->numProc << "/" << req->numConn << "/" << req->numReq << " - " << req->remoteAddr
-            << " - [" << req->resp.sLogTime << "] - ";
-    if (req->reqMethod > 0)
-            ss << "\"" << get_str_method(req->reqMethod) << " " << req->uri
-               << " " << get_str_http_prot(req->httpProt) << "\" ";
-    else
-            ss << "\"-\" ";
-        
-    ss << req->resp.respStatus << " " << req->resp.send_bytes << " "
-            << "\"" << ((req->req_hdrs.iReferer >= 0) ? req->req_hdrs.Value[req->req_hdrs.iReferer] : "-") << "\" "
-            << "\"" << ((req->req_hdrs.iUserAgent >= 0) ? req->req_hdrs.Value[req->req_hdrs.iUserAgent] : "-")
-            << "\""
-            << " " << (req->connKeepAlive ? "KeepAlive" : "Close") << "\n";
-mtxLog.lock();
+    if (req->reqMethod <= 0)
+        return;
+    ss  << req->numProc << "/" << req->numConn << "/" << req->numReq << " - " << req->remoteAddr
+        << " - [" << req->resp.sLogTime << "] - \"" << get_str_method(req->reqMethod) << " " << req->decodeUri
+        << ((req->sReqParam) ? "?" : "") << ((req->sReqParam) ? req->sReqParam : "") << " "
+        << get_str_http_prot(req->httpProt) << "\" "
+        << req->resp.respStatus << " " << req->resp.send_bytes << " "
+        << "\"" << ((req->req_hd.iReferer >= 0) ? req->reqHdValue[req->req_hd.iReferer] : "-") << "\" "
+        << "\"" << ((req->req_hd.iUserAgent >= 0) ? req->reqHdValue[req->req_hd.iUserAgent] : "-") << "\"\n";
+//mtxLog.lock();
     write(flog, ss.c_str(), ss.size());
-mtxLog.unlock();
+//mtxLog.unlock();
 }

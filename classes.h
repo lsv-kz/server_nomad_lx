@@ -90,7 +90,6 @@ class ClChunked
     char buf[CHUNK_SIZE_BUF + MAX_LEN_SIZE_CHUNK + 10];
     ClChunked() {};
     //------------------------------------------------------------------
-    //[[gnu::noinline]]
     int send_chunk(int size)
     {
         if (err) return -1;
