@@ -84,41 +84,43 @@ struct Config
 {
     String ServerSoftware;
 
-    String host;
-    String servPort;
+    String ServerAddr;
+    String ServerPort;
 
-    String rootDir;
-    String cgiDir;
-    String logDir;
+    String DocumentRoot;
+    String ScriptPath;
+    String LogPath;
+    String PidFilePath;
 
     String UsePHP;
     String PathPHP;
 
     int ListenBacklog;
     char tcp_cork;
-    char TcpNoDelay;
-    int NumProc;
-
-    char SEND_FILE;
-    long SEND_FILE_SIZE_PART;
-    int SNDBUF_SIZE;
-
-    int MAX_REQUESTS;
-    int MAX_EVENT_SOCK;
+    char tcp_nodelay;
     
+    char SendFile;
+    int SndBufSize;
+
+    int OverMaxConnections;
+    int MaxWorkConnections;
+    int MaxConnections;
+    
+    int MaxEventConnections;
+    
+    int NumProc;
     int MaxThreads;
     int MinThreads;
-    int MaxRequestsPerThr;
     int MaxCgiProc;
 
     int MaxRanges;
     long int ClientMaxBodySize;
 
-    char KeepAlive;
+    int MaxRequestsPerClient;
     int TimeoutKeepAlive;
     int TimeOut;
-    int TIMEOUT_POLL;
     int TimeoutCGI;
+    int TimeoutPoll;
 
     char AutoIndex;
     char index_html;
@@ -151,7 +153,7 @@ struct Config
             if (t)
                 delete t;
         }
-        std::cout << "******* " << getpid() << " *******\n";
+        std::cout << __func__ << " ******* " << getpid() << " *******\n";
     }
 };
 //----------------------------------------------------------------------
@@ -213,22 +215,17 @@ public:
     char  *reqHdName[MAX_HEADERS + 1];
     const char  *reqHdValue[MAX_HEADERS + 1];
     //--------------------------------------
-    struct {
-        int       respStatus;
-        String    sLogTime;
-        long long respContentLength;
-        const char *respContentType;
-        long long fileSize;
-        int       countRespHeaders;
-        
-        int       scriptType;
-        const char *scriptName;
-        
-        int       numPart;
-        int       fd;
-        off_t offset;
-        long long send_bytes;
-    } resp;
+    String    sLogTime;
+    int       respStatus;
+    int       scriptType;
+    const char *scriptName;
+    int       numPart;
+    long long respContentLength;
+    const char *respContentType;
+    long long fileSize;
+    int       fd;
+    off_t offset;
+    long long send_bytes;
     
     void init();
     int hd_read();
@@ -249,7 +246,7 @@ private:
     int num_wait_thr, size_list;
     int count_thr, stop_manager;
     
-    int numChld;
+    int NumProc;
     unsigned long all_thr;
 
     RequestManager() {}
@@ -338,6 +335,10 @@ void end_response(Connect *req);
 void event_handler(RequestManager *ReqMan);
 void push_pollin_list(Connect *req);
 void push_pollout_list(Connect *req);
+void push_conn(Connect *req);
+void dec_work_conn();
 void close_event_handler();
+//----------------------------------------------------------------------
+int set_max_fd(int max_open_fd);
 
 #endif

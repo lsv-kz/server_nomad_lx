@@ -65,7 +65,7 @@ int index_chunked(Connect *req, char **list, int numFiles, String& path)
 
     ClChunked chunk_buf(req, chunk);
 //print_err(req, "<%s:%d> ---------------\n", __func__, __LINE__);
-    req->resp.respStatus = RS200;
+    req->respStatus = RS200;
     String hdrs(64);
     if (hdrs.error())
     {
@@ -78,7 +78,7 @@ int index_chunked(Connect *req, char **list, int numFiles, String& path)
     }
 
     hdrs << "Content-Type: text/html\r\n";
-    req->resp.respContentLength = -1;
+    req->respContentLength = -1;
     
     if (chunk)
     {
@@ -193,7 +193,7 @@ int index_chunked(Connect *req, char **list, int numFiles, String& path)
     //------------------------------------------------------------------
     chunk_buf << "  </table>\r\n"
               "  <hr>\r\n"
-              "  " << req->resp.sLogTime << "\r\n"
+              "  " << req->sLogTime << "\r\n"
               "  <a href=\"#top\" style=\"display:block;\r\n"
               "         position:fixed;\r\n"
               "         bottom:30px;\r\n"
@@ -214,10 +214,10 @@ int index_chunked(Connect *req, char **list, int numFiles, String& path)
     }
     //------------------------------------------------------------------
     n = chunk_buf.end();
-    req->resp.respContentLength = chunk_buf.all();
+    req->respContentLength = chunk_buf.all();
     if (n < 0)
     {
-        req->resp.send_bytes = chunk_buf.all();
+        req->send_bytes = chunk_buf.all();
         print_err(req, "<%s:%d>   Error chunk_buf.end(): %d\n", __func__, __LINE__, n);
         return -1;
     }
@@ -231,7 +231,7 @@ int index_chunked(Connect *req, char **list, int numFiles, String& path)
         }
     }
     else
-        req->resp.send_bytes = req->resp.respContentLength;
+        req->send_bytes = req->respContentLength;
 
     return 0;
 }

@@ -104,10 +104,10 @@ void print_log(Connect *req)
     if (req->reqMethod <= 0)
         return;
     ss  << req->numProc << "/" << req->numConn << "/" << req->numReq << " - " << req->remoteAddr
-        << " - [" << req->resp.sLogTime << "] - \"" << get_str_method(req->reqMethod) << " " << req->decodeUri
+        << " - [" << req->sLogTime << "] - \"" << get_str_method(req->reqMethod) << " " << req->decodeUri
         << ((req->sReqParam) ? "?" : "") << ((req->sReqParam) ? req->sReqParam : "") << " "
         << get_str_http_prot(req->httpProt) << "\" "
-        << req->resp.respStatus << " " << req->resp.send_bytes << " "
+        << req->respStatus << " " << req->send_bytes << " "
         << "\"" << ((req->req_hd.iReferer >= 0) ? req->reqHdValue[req->req_hd.iReferer] : "-") << "\" "
         << "\"" << ((req->req_hd.iUserAgent >= 0) ? req->reqHdValue[req->req_hd.iUserAgent] : "-") << "\"\n";
 //mtxLog.lock();

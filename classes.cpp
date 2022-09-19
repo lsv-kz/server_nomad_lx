@@ -19,17 +19,16 @@ void Connect::init()
 
     req_hd = {-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1LL};
 
-    resp.fd = -1;
-    resp.respStatus = 0;
-    resp.respContentType = NULL;
+    fd = -1;
+    respStatus = 0;
+    respContentType = NULL;
 
-    resp.countRespHeaders = 0;
-    resp.send_bytes = 0LL;
-    resp.numPart = 0;
-    resp.scriptName = NULL;
+    send_bytes = 0LL;
+    numPart = 0;
+    scriptName = NULL;
 
-    resp.offset = 0;
-    resp.respContentLength = -1LL;
+    offset = 0;
+    respContentLength = -1LL;
 }
 
 int Connect::hd_read()

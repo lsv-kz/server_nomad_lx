@@ -72,7 +72,7 @@ int kill_script(Connect *req, int pid, int stat, const char *msg)
     req->connKeepAlive = 0;
     if (stat > 0)
     {
-        req->resp.respStatus = stat;
+        req->respStatus = stat;
         send_message(req, msg, NULL);
     }
 
@@ -103,7 +103,7 @@ int cgi_chunk(Connect *req, String *hdrs, int cgi_serv_in, pid_t pid, char *tail
             print_err("<%s:%d> Error send_header_response()\n", __func__, __LINE__);
             return -1;
         }
-        req->resp.respContentLength = tail_len + n;
+        req->respContentLength = tail_len + n;
         if (send_response_headers(req, hdrs))
         {
             print_err("<%s:%d> Error send_header_response()\n", __func__, __LINE__);
@@ -121,7 +121,7 @@ int cgi_chunk(Connect *req, String *hdrs, int cgi_serv_in, pid_t pid, char *tail
         return -1;
     }
     
-    if (req->resp.respStatus == RS204)
+    if (req->respStatus == RS204)
     {
         return 0;
     }
@@ -146,7 +146,7 @@ int cgi_chunk(Connect *req, String *hdrs, int cgi_serv_in, pid_t pid, char *tail
     
     //ReadFromScript += n;
     int ret = chunk_buf.end();
-    req->resp.send_bytes = chunk_buf.all();
+    req->send_bytes = chunk_buf.all();
     if (ret < 0)
     {
         print_err(req, "<%s:%d> Error chunk_buf.end(): %d\n", __func__, __LINE__, ret);
@@ -158,7 +158,7 @@ int cgi_chunk(Connect *req, String *hdrs, int cgi_serv_in, pid_t pid, char *tail
 //======================================================================
 int cgi_read_headers(Connect *req, int cgi_serv_in, pid_t pid)
 {
-    req->resp.respStatus = RS200;
+    req->respStatus = RS200;
     
     String hdrs(256);
     if (hdrs.error())
@@ -242,9 +242,9 @@ int cgi_read_headers(Connect *req, int cgi_serv_in, pid_t pid)
         
         if (!strlcmp_case(str, "Status", 6))
         {
-            req->resp.respStatus = atoi(str + 7);//  req->respStatus = strtol(str + 7, NULL, 10);
-            print_err(req, "<%s:%d> Status=%d\n", __func__, __LINE__, req->resp.respStatus);
-            if (req->resp.respStatus >= RS500)
+            req->respStatus = atoi(str + 7);//  req->respStatus = strtol(str + 7, NULL, 10);
+            print_err(req, "<%s:%d> Status=%d\n", __func__, __LINE__, req->respStatus);
+            if (req->respStatus >= RS500)
             {
                 close(cgi_serv_in);
                 send_message(req, NULL, NULL);
@@ -322,12 +322,12 @@ int cgi_fork(Connect *req, int *serv_cgi, int *cgi_serv, String& path)
                 goto err_child;
         }
 
-        if (req->resp.scriptType == php_cgi)
+        if (req->scriptType == php_cgi)
             setenv("REDIRECT_STATUS", "true", 1);
         setenv("PATH", "/bin:/usr/bin:/usr/local/bin", 1);
         setenv("SERVER_SOFTWARE", conf->ServerSoftware.c_str(), 1);
         setenv("GATEWAY_INTERFACE", "CGI/1.1", 1);
-        setenv("DOCUMENT_ROOT", conf->rootDir.c_str(), 1);
+        setenv("DOCUMENT_ROOT", conf->DocumentRoot.c_str(), 1);
         setenv("REMOTE_ADDR", req->remoteAddr, 1);
         setenv("REMOTE_PORT", req->remotePort, 1);
         setenv("REQUEST_URI", req->uri, 1);
@@ -340,7 +340,7 @@ int cgi_fork(Connect *req, int *serv_cgi, int *cgi_serv, String& path)
         if (req->req_hd.iUserAgent >= 0)
             setenv("HTTP_USER_AGENT", req->reqHdValue[req->req_hd.iUserAgent], 1);
 
-        setenv("SCRIPT_NAME", req->resp.scriptName, 1);
+        setenv("SCRIPT_NAME", req->scriptName, 1);
         setenv("SCRIPT_FILENAME", path.c_str(), 1);
 
         if (req->reqMethod == M_POST)
@@ -353,11 +353,11 @@ int cgi_fork(Connect *req, int *serv_cgi, int *cgi_serv, String& path)
 
         setenv("QUERY_STRING", req->sReqParam ? req->sReqParam : "", 1);
 
-        if (req->resp.scriptType == cgi_ex)
+        if (req->scriptType == cgi_ex)
         {
-            execl(path.c_str(), base_name(req->resp.scriptName), NULL);
+            execl(path.c_str(), base_name(req->scriptName), NULL);
         }
-        else if (req->resp.scriptType == php_cgi)
+        else if (req->scriptType == php_cgi)
         {
             if (conf->UsePHP == "php-cgi")
                 execl(conf->PathPHP.c_str(), base_name(conf->PathPHP.c_str()), NULL);
@@ -379,7 +379,7 @@ int cgi_fork(Connect *req, int *serv_cgi, int *cgi_serv, String& path)
                 "  <hr>\n"
                 "  %s\n"
                 " </body>\n"
-                "</html>", strerror(errno), errno, req->resp.sLogTime.c_str());
+                "</html>", strerror(errno), errno, req->sLogTime.c_str());
         exit(EXIT_FAILURE);
     }
     else
@@ -472,16 +472,16 @@ int cgi(Connect *req)
         return -1;
     }
 
-    n = strlen(req->resp.scriptName);
+    n = strlen(req->scriptName);
 
     String path;
-    switch (req->resp.scriptType)
+    switch (req->scriptType)
     {
         case cgi_ex:
-            path << conf->cgiDir << get_script_name(req->resp.scriptName);
+            path << conf->ScriptPath << get_script_name(req->scriptName);
             break;
         case php_cgi:
-            path << conf->rootDir << req->resp.scriptName;
+            path << conf->DocumentRoot << req->scriptName;
             break;
         default:
             print_err(req, "<%s:%d> ScriptType \?(404)\n", __func__, __LINE__);

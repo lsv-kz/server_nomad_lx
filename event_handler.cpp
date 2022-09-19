@@ -8,68 +8,70 @@
 
 using namespace std;
 
-static Connect *list_start = NULL;
-static Connect *list_end = NULL;
+static Connect *wait_conn_start = NULL;
+static Connect *wait_conn_end = NULL;
+//----------------------------------------------------------------------
+static Connect *work_conn_start = NULL;
+static Connect *work_conn_end = NULL;
 
 static Connect *list_new_start = NULL;
 static Connect *list_new_end = NULL;
 
-static Connect **array_conn = NULL;
-static struct pollfd *arr_pollfd;
+static Connect **conn_array;
+static struct pollfd *pollfd_array;
 
 static mutex mtx_;
 static condition_variable cond_;
 
 static int close_thr = 0;
-static int num_proc_;
-
-int size_buf;
-char *snd_buf;
+static int size_buf;
+static char *snd_buf;
+static int work_conn = 0;
 //======================================================================
 int send_part_file(Connect *req)
 {
     int rd, wr, len;
     errno = 0;
-    
-    if (req->resp.respContentLength == 0)
+
+    if (req->respContentLength == 0)
         return 0;
 #if defined(SEND_FILE_) && (defined(LINUX_) || defined(FREEBSD_))
-    if (conf->SEND_FILE == 'y')
+    if (conf->SendFile == 'y')
     {
-        if (req->resp.respContentLength >= size_buf)
+        if (req->respContentLength >= size_buf)
             len = size_buf;
         else
-            len = req->resp.respContentLength;
+            len = req->respContentLength;
     #if defined(LINUX_)
-        wr = sendfile(req->clientSocket, req->resp.fd, &req->resp.offset, len);
+        wr = sendfile(req->clientSocket, req->fd, &req->offset, len);
         if (wr == -1)
         {
             if (errno == EAGAIN)
                 return -EAGAIN;
-            print_err(req, "<%s:%d> Error sendfile(); %s\n", __func__, __LINE__, strerror(errno));
+            print_err(req, "<%s:%d> Error sendfile(): %s\n", __func__, __LINE__, strerror(errno));
             return wr;
         }
     #elif defined(FREEBSD_)
         off_t wr_bytes;
-        int ret = sendfile(req->resp.fd, req->clientSocket, req->resp.offset, len, NULL, &wr_bytes, 0);// SF_NODISKIO SF_NOCACHE
+        int ret = sendfile(req->fd, req->clientSocket, req->offset, len, NULL, &wr_bytes, 0);// SF_NODISKIO SF_NOCACHE
         if (ret == -1)
         {
             if (errno == EAGAIN)
             {
                 if (wr_bytes == 0)
                     return -EAGAIN;
-                req->resp.offset += wr_bytes;
+                req->offset += wr_bytes;
                 wr = wr_bytes;
             }
             else
             {
-                print_err("<%s:%d> Error sendfile(); %s\n", __func__, __LINE__, strerror(errno));
+                print_err("<%s:%d> Error sendfile(): %s\n", __func__, __LINE__, strerror(errno));
                 return -1;
             }
         }
         else if (ret == 0)
         {
-            req->resp.offset += wr_bytes;
+            req->offset += wr_bytes;
             wr = wr_bytes;
         }
         else
@@ -82,12 +84,12 @@ int send_part_file(Connect *req)
     else
 #endif
     {
-        if (req->resp.respContentLength >= size_buf)
+        if (req->respContentLength >= size_buf)
             len = size_buf;
         else
-            len = req->resp.respContentLength;
+            len = req->respContentLength;
 
-        rd = read(req->resp.fd, snd_buf, len);
+        rd = read(req->fd, snd_buf, len);
         if (rd <= 0)
         {
             if (rd == -1)
@@ -100,19 +102,19 @@ int send_part_file(Connect *req)
         {
             if (errno == EAGAIN)
             {
-                lseek(req->resp.fd, -rd, SEEK_CUR);
+                lseek(req->fd, -rd, SEEK_CUR);
                 return -EAGAIN;
             }
             print_err(req, "<%s:%d> Error write(); %s\n", __func__, __LINE__, strerror(errno));
             return wr;
         }
         else if (rd != wr)
-            lseek(req->resp.fd, wr - rd, SEEK_CUR);
+            lseek(req->fd, wr - rd, SEEK_CUR);
     }
     
-    req->resp.send_bytes += wr;
-    req->resp.respContentLength -= wr;
-    if (req->resp.respContentLength == 0)
+    req->send_bytes += wr;
+    req->respContentLength -= wr;
+    if (req->respContentLength == 0)
         wr = 0;
 
     return wr;
@@ -121,7 +123,7 @@ int send_part_file(Connect *req)
 static void del_from_list(Connect *r)
 {
     if (r->event == POLLOUT)
-        close(r->resp.fd);
+        close(r->fd);
     
     if (r->prev && r->next)
     {
@@ -131,15 +133,15 @@ static void del_from_list(Connect *r)
     else if (r->prev && !r->next)
     {
         r->prev->next = r->next;
-        list_end = r->prev;
+        work_conn_end = r->prev;
     }
     else if (!r->prev && r->next)
     {
         r->next->prev = r->prev;
-        list_start = r->next;
+        work_conn_start = r->next;
     }
     else if (!r->prev && !r->next)
-        list_start = list_end = NULL;
+        work_conn_start = work_conn_end = NULL;
 }
 //======================================================================
 int set_list()
@@ -147,20 +149,20 @@ int set_list()
 mtx_.lock();
     if (list_new_start)
     {
-        if (list_end)
-            list_end->next = list_new_start;
+        if (work_conn_end)
+            work_conn_end->next = list_new_start;
         else
-            list_start = list_new_start;
+            work_conn_start = list_new_start;
         
-        list_new_start->prev = list_end;
-        list_end = list_new_end;
+        list_new_start->prev = work_conn_end;
+        work_conn_end = list_new_end;
         list_new_start = list_new_end = NULL;
     }
 mtx_.unlock();
-    
-    int i = 0;
+
     time_t t = time(NULL);
-    Connect *r = list_start, *next = NULL;
+    Connect *r = work_conn_start, *next = NULL;
+    int i = 0;
     for ( ; r; r = next)
     {
         next = r->next;
@@ -176,7 +178,7 @@ mtx_.unlock();
             }
             else
                 r->err = NO_PRINT_LOG;
-            
+
             del_from_list(r);
             end_response(r);
         }
@@ -184,10 +186,10 @@ mtx_.unlock();
         {
             if (r->sock_timer == 0)
                 r->sock_timer = t;
-            
-            arr_pollfd[i].fd = r->clientSocket;
-            arr_pollfd[i].events = r->event;
-            array_conn[i] = r;
+
+            pollfd_array[i].fd = r->clientSocket;
+            pollfd_array[i].events = r->event;
+            conn_array[i] = r;
             ++i;
         }
     }
@@ -197,7 +199,7 @@ mtx_.unlock();
 //======================================================================
 int poll_(int num_chld, int i, int nfd, RequestManager *ReqMan)
 {
-    int ret = poll(arr_pollfd + i, nfd, conf->TIMEOUT_POLL);
+    int ret = poll(pollfd_array + i, nfd, conf->TimeoutPoll);
     if (ret == -1)
     {
         print_err("[%d]<%s:%d> Error poll(): %s\n", num_chld, __func__, __LINE__, strerror(errno));
@@ -209,8 +211,8 @@ int poll_(int num_chld, int i, int nfd, RequestManager *ReqMan)
     Connect *r = NULL;
     for ( ; (i < nfd) && (ret > 0); ++i)
     {
-        r = array_conn[i];
-        if (arr_pollfd[i].revents == POLLOUT)
+        r = conn_array[i];
+        if (pollfd_array[i].revents == POLLOUT)
         {
             int wr = send_part_file(r);
             if (wr == 0)
@@ -236,7 +238,7 @@ int poll_(int num_chld, int i, int nfd, RequestManager *ReqMan)
             }
             --ret;
         }
-        else if (arr_pollfd[i].revents == POLLIN)
+        else if (pollfd_array[i].revents == POLLIN)
         {
             int n = r->hd_read();
             if (n == -EAGAIN)
@@ -256,9 +258,9 @@ int poll_(int num_chld, int i, int nfd, RequestManager *ReqMan)
                 r->sock_timer = 0;
             --ret;
         }
-        else if (arr_pollfd[i].revents)
+        else if (pollfd_array[i].revents)
         {
-            print_err(r, "<%s:%d> Error: events=0x%x, revents=0x%x\n", __func__, __LINE__, arr_pollfd[i].events, arr_pollfd[i].revents);
+            print_err(r, "<%s:%d> Error: events=0x%x, revents=0x%x\n", __func__, __LINE__, pollfd_array[i].events, pollfd_array[i].revents);
             if (r->event == POLLOUT)
             {
                 r->req_hd.iReferer = MAX_HEADERS - 1;
@@ -281,15 +283,27 @@ void event_handler(RequestManager *ReqMan)
 {
     int num_chld = ReqMan->get_num_chld();
     int count_resp = 0;
-    size_buf = conf->SEND_FILE_SIZE_PART;
+    size_buf = conf->SndBufSize;
     snd_buf = NULL;
-    num_proc_ = num_chld;
-    
+
+    if (conf->MaxEventConnections <= 0)
+    {
+        print_err("[%d]<%s:%d> Error config file: MaxEventConnections=%d\n", num_chld, __func__, __LINE__, conf->MaxEventConnections);
+        kill(getppid(), SIGINT);
+        exit(1);
+    }
+
+    if (conf->SndBufSize <= 0)
+    {
+        print_err("[%d]<%s:%d> Error config file: SndBufSize=%d\n", num_chld, __func__, __LINE__, conf->SndBufSize);
+        kill(getppid(), SIGINT);
+        exit(1);
+    }
+
 #if defined(SEND_FILE_) && (defined(LINUX_) || defined(FREEBSD_))
-    if (conf->SEND_FILE != 'y')
+    if (conf->SendFile != 'y')
 #endif
     {
-        size_buf = conf->SNDBUF_SIZE;
         snd_buf = new (nothrow) char [size_buf];
         if (!snd_buf)
         {
@@ -297,16 +311,16 @@ void event_handler(RequestManager *ReqMan)
             exit(1);
         }
     }
-    
-    arr_pollfd = new(nothrow) struct pollfd [conf->MAX_REQUESTS];
-    if (!arr_pollfd)
+
+    pollfd_array = new(nothrow) struct pollfd [conf->MaxWorkConnections];
+    if (!pollfd_array)
     {
         print_err("[%d]<%s:%d> Error malloc(): %s\n", num_chld, __func__, __LINE__, strerror(errno));
         exit(1);
     }
 
-    array_conn = new(nothrow) Connect* [conf->MAX_REQUESTS];
-    if (!array_conn)
+    conn_array = new(nothrow) Connect* [conf->MaxWorkConnections];
+    if (!conn_array)
     {
         print_err("[%d]<%s:%d> Error malloc(): %s\n", num_chld, __func__, __LINE__, strerror(errno));
         exit(1);
@@ -315,26 +329,58 @@ void event_handler(RequestManager *ReqMan)
     while (1)
     {
         {
-            unique_lock<mutex> lk(mtx_);
-            
-            while ((!list_start) && (!list_new_start) && (!close_thr))
+    unique_lock<mutex> lk(mtx_);
+            while ((!work_conn_start) && (!list_new_start) && (!wait_conn_end) && (!close_thr))
             {
                 cond_.wait(lk);
             }
 
             if (close_thr)
                 break;
-        }
+            
+            while (work_conn < conf->MaxWorkConnections)
+            {
+                if (wait_conn_start)
+                {
+                    Connect *r = wait_conn_start;
+                
+                    if (wait_conn_start == wait_conn_end)
+                        wait_conn_end = wait_conn_start = NULL;
+                    else
+                    {
+                        wait_conn_start = wait_conn_start->next;
+                    }
 
+                    r->init();
+                    get_time(r->sLogTime);
+                    r->event = POLLIN;
+                    r->sock_timer = 0;
+                    r->next = NULL;
+                    r->prev = list_new_end;
+                    if (list_new_start)
+                    {
+                        list_new_end->next = r;
+                        list_new_end = r;
+                    }
+                    else
+                        list_new_start = list_new_end = r;
+
+                    ++work_conn;
+                }
+                else
+                    break;
+            }
+        }
+        
         count_resp = set_list();
         if (count_resp == 0)
             continue;
-        
+
         int nfd;
         for (int i = 0; count_resp > 0; )
         {
-            if (count_resp > conf->MAX_EVENT_SOCK)
-                nfd = conf->MAX_EVENT_SOCK;
+            if (count_resp > conf->MaxEventConnections)
+                nfd = conf->MaxEventConnections;
             else
                 nfd = count_resp;
 
@@ -352,10 +398,10 @@ void event_handler(RequestManager *ReqMan)
         }
     }
 
-    delete [] arr_pollfd;
-    delete [] array_conn;
+    delete [] pollfd_array;
+    delete [] conn_array;
 #if defined(SEND_FILE_) && (defined(LINUX_) || defined(FREEBSD_))
-    if (conf->SEND_FILE != 'y')
+    if (conf->SendFile != 'y')
 #endif
         if (snd_buf) delete [] snd_buf;
     print_err("*** Exit [%s:proc=%d] ***\n", __func__, num_chld);
@@ -364,7 +410,7 @@ void event_handler(RequestManager *ReqMan)
 void push_pollout_list(Connect *req)
 {
     req->event = POLLOUT;
-    lseek(req->resp.fd, req->resp.offset, SEEK_SET);
+    lseek(req->fd, req->offset, SEEK_SET);
     req->sock_timer = 0;
     req->next = NULL;
 mtx_.lock();
@@ -383,7 +429,7 @@ mtx_.unlock();
 void push_pollin_list(Connect *req)
 {
     req->init();
-    get_time(req->resp.sLogTime);
+    get_time(req->sLogTime);
     req->event = POLLIN;
     req->sock_timer = 0;
     req->next = NULL;
@@ -398,6 +444,29 @@ mtx_.lock();
         list_new_start = list_new_end = req;
 mtx_.unlock();
     cond_.notify_one();
+}
+//======================================================================
+void push_conn(Connect *req)
+{
+mtx_.lock();
+    req->next = NULL;
+    if (wait_conn_start)
+    {
+        req->prev = wait_conn_end;
+        wait_conn_end->next = req;
+        wait_conn_end = req;
+    }
+    else
+        wait_conn_end = wait_conn_start = req;
+mtx_.unlock();
+    cond_.notify_one();
+}
+//======================================================================
+void dec_work_conn()
+{
+mtx_.lock();
+    --work_conn;
+mtx_.unlock();
 }
 //======================================================================
 void close_event_handler(void)

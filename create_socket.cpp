@@ -24,7 +24,7 @@ int create_server_socket(const Config *conf)
         return -1;
     }
 
-    if (conf->TcpNoDelay == 'y')
+    if (conf->tcp_nodelay == 'y')
     {
         if (setsockopt(sockfd, IPPROTO_TCP, TCP_NODELAY, (void *)&sock_opt, sizeof(sock_opt)))
         {
@@ -37,13 +37,13 @@ int create_server_socket(const Config *conf)
     optlen = sizeof(sndbuf);
     if (!getsockopt(sockfd, SOL_SOCKET, SO_SNDBUF, (void *)&sndbuf, &optlen))
     {
-        printf("<%s:%d> SNDBUF_SIZE=%d\n", __func__, __LINE__, conf->SNDBUF_SIZE);
+        printf("<%s:%d> SndBufSize=%d\n", __func__, __LINE__, conf->SndBufSize);
         printf("<%s:%d> SO_SNDBUF=%d\n", __func__, __LINE__, sndbuf);
     }
     //------------------------------------------------------------------
     memset(&server_sockaddr, 0, sizeof server_sockaddr);
     server_sockaddr.sin_family = PF_INET;
-    server_sockaddr.sin_port = htons(atoi(conf->servPort.c_str()));
+    server_sockaddr.sin_port = htons(atoi(conf->ServerPort.c_str()));
 
 /*  if (inet_pton(PF_INET, addr, &(server_sockaddr.sin_addr)) < 1)
     {
@@ -51,7 +51,7 @@ int create_server_socket(const Config *conf)
         close(sockfd);
         return -1;
     }*/
-    server_sockaddr.sin_addr.s_addr = inet_addr(conf->host.c_str());
+    server_sockaddr.sin_addr.s_addr = inet_addr(conf->ServerAddr.c_str());
     
     if (bind(sockfd, (struct sockaddr *) &server_sockaddr, sizeof (server_sockaddr)) == -1)
     {
@@ -166,7 +166,7 @@ int create_server_socket_(const Config *conf)
     hints.ai_socktype = SOCK_STREAM;
     hints.ai_flags = AI_PASSIVE;
 
-    if ((n = getaddrinfo(conf->host.c_str(), conf->servPort.c_str(), &hints, &servinfo)) != 0) 
+    if ((n = getaddrinfo(conf->ServerAddr.c_str(), conf->ServerPort.c_str(), &hints, &servinfo)) != 0) 
     {
         fprintf(stderr, "Error getaddrinfo: %s;\n", gai_strerror(n));
         return -1;
@@ -195,7 +195,7 @@ int create_server_socket_(const Config *conf)
         optlen = sizeof sndbuf;
         if (!getsockopt(sockfd, SOL_SOCKET, SO_SNDBUF, (void *)&sndbuf, &optlen))
         {
-            printf("<%s:%d> SNDBUF_SIZE=%d\n", __func__, __LINE__, conf->SNDBUF_SIZE);
+            printf("<%s:%d> SndBufSize=%d\n", __func__, __LINE__, conf->SndBufSize);
             printf("<%s:%d> SO_SNDBUF=%d\n", __func__, __LINE__, sndbuf);
         }
         

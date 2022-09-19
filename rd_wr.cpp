@@ -316,14 +316,14 @@ int send_largefile(Connect *req, char *buf, int size, off_t offset, long long *c
 {
     int rd, wr;
 
-    lseek(req->resp.fd, offset, SEEK_SET);
+    lseek(req->fd, offset, SEEK_SET);
 
     for ( ; *cont_len > 0; )
     {
         if (*cont_len < size)
-            rd = read(req->resp.fd, buf, *cont_len);
+            rd = read(req->fd, buf, *cont_len);
         else
-            rd = read(req->resp.fd, buf, size);
+            rd = read(req->fd, buf, size);
         
         if (rd == -1)
         {

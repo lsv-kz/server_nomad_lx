@@ -22,7 +22,7 @@ void response1(RequestManager *ReqMan)
             return;
         }
         //--------------------------------------------------------------
-        get_time(req->resp.sLogTime);
+        get_time(req->sLogTime);
         int ret = parse_startline_request(req, req->reqHdName[0]);
         if (ret)
         {
@@ -42,7 +42,7 @@ void response1(RequestManager *ReqMan)
     #ifdef TCP_CORK_
         if (conf->tcp_cork == 'y')
         {
-            #if defined(LINUX_)
+        #if defined(LINUX_)
             int optval = 1;
             setsockopt(req->clientSocket, SOL_TCP, TCP_CORK, &optval, sizeof(optval));
         #elif defined(FREEBSD_)
@@ -59,7 +59,7 @@ void response1(RequestManager *ReqMan)
             goto end;
         }
 
-        if (req->numReq >= (unsigned int)conf->MaxRequestsPerThr || (conf->KeepAlive == 'n') || (req->httpProt == HTTP10))
+        if (req->numReq >= (unsigned int)conf->MaxRequestsPerClient || (req->httpProt == HTTP10))
             req->connKeepAlive = 0;
         else if (req->req_hd.iConnection == -1)
             req->connKeepAlive = 1;
@@ -122,12 +122,8 @@ void response1(RequestManager *ReqMan)
             req->err = -RS501;
 
     end:
-
         if (req->err <= -RS101)
         {
-            req->resp.respStatus = -req->err;
-            send_message(req, "", NULL);
-
             if ((req->reqMethod == M_POST) || (req->reqMethod == M_PUT))
                 req->connKeepAlive = 0;
         }
@@ -180,10 +176,10 @@ int fastcgi(Connect* req, const char* uri)
 
     if (!i)
         return -RS404;
-    req->resp.scriptType = fast_cgi;
-    req->resp.scriptName = i->scrpt_name.c_str();
+    req->scriptType = fast_cgi;
+    req->scriptName = i->scrpt_name.c_str();
     int ret = fcgi(req);
-    req->resp.scriptName = NULL;
+    req->scriptName = NULL;
     return ret;
 }
 //======================================================================
@@ -207,22 +203,22 @@ int response2(Connect *req)
             return -RS404;
         }
         
-        req->resp.scriptName = req->decodeUri;
+        req->scriptName = req->decodeUri;
 
         if (conf->UsePHP == "php-fpm")
         {
-            req->resp.scriptType = php_fpm;
+            req->scriptType = php_fpm;
             ret = fcgi(req);
         }
         else if (conf->UsePHP == "php-cgi")
         {
-            req->resp.scriptType = php_cgi;
+            req->scriptType = php_cgi;
             ret = cgi(req);
         }
         else
             ret = -1;
 
-        req->resp.scriptName = NULL;
+        req->scriptName = NULL;
         return ret;
     }
     
@@ -230,8 +226,8 @@ int response2(Connect *req)
         || !strncmp(req->decodeUri, "/cgi/", 5))
     {
         int ret;
-        req->resp.scriptType = cgi_ex;
-        req->resp.scriptName = req->decodeUri;
+        req->scriptType = cgi_ex;
+        req->scriptName = req->decodeUri;
         ret = cgi(req);
         return ret;
     }
@@ -271,7 +267,7 @@ int response2(Connect *req)
         {
             req->uri[req->uriLen] = '/';
             req->uri[req->uriLen + 1] = '\0';
-            req->resp.respStatus = RS301;
+            req->respStatus = RS301;
             
             String hdrs(127);
             hdrs << "Location: " << req->uri << "\r\n";
@@ -308,22 +304,22 @@ int response2(Connect *req)
                 {
                     String s = req->decodeUri;
                     s << "index.php";
-                    req->resp.scriptName = s.c_str();
+                    req->scriptName = s.c_str();
                     
                     if (conf->UsePHP == "php-fpm")
                     {
-                        req->resp.scriptType = php_fpm;
+                        req->scriptType = php_fpm;
                         ret = fcgi(req);
                     }
                     else if (conf->UsePHP == "php-cgi")
                     {
-                        req->resp.scriptType = php_cgi;
+                        req->scriptType = php_cgi;
                         ret = cgi(req);
                     }
                     else
                         ret = -1;
                     
-                    req->resp.scriptName = NULL;
+                    req->scriptName = NULL;
                     return ret;
                 }
                 path.resize(len);
@@ -331,19 +327,19 @@ int response2(Connect *req)
             
             if (conf->index_pl == 'y')
             {
-                req->resp.scriptType = cgi_ex;
-                req->resp.scriptName = "/cgi-bin/index.pl";
+                req->scriptType = cgi_ex;
+                req->scriptName = "/cgi-bin/index.pl";
                 ret = cgi(req);
-                req->resp.scriptName = NULL;
+                req->scriptName = NULL;
                 if (ret == 0)
                     return ret;
             }
             else if (conf->index_fcgi == 'y')
             {
-                req->resp.scriptType = fast_cgi;
-                req->resp.scriptName = "/index.fcgi";
+                req->scriptType = fast_cgi;
+                req->scriptName = "/index.fcgi";
                 ret = fcgi(req);
-                req->resp.scriptName = NULL;
+                req->scriptName = NULL;
                 if (ret == 0)
                     return ret;
             }
@@ -361,12 +357,12 @@ int response2(Connect *req)
     if (req->reqMethod == M_POST)
         return -RS405;
     //--------------------- send file ----------------------------------
-    req->resp.fileSize = file_size(path.c_str());
-    req->resp.numPart = 0;
-    req->resp.respContentType = content_type(path.c_str());
+    req->fileSize = file_size(path.c_str());
+    req->numPart = 0;
+    req->respContentType = content_type(path.c_str());
     //------------------------------------------------------------------
-    req->resp.fd = open(path.c_str(), O_RDONLY);
-    if (req->resp.fd == -1)
+    req->fd = open(path.c_str(), O_RDONLY);
+    if (req->fd == -1)
     {
         if (errno == EACCES)
             return -RS403;
@@ -381,7 +377,7 @@ int response2(Connect *req)
     
     int ret = send_file(req);
     if (ret != 1)
-        close(req->resp.fd);
+        close(req->fd);
     
     return ret;
 }
@@ -392,18 +388,18 @@ int send_file(Connect *req)
     {
         int err;
         
-        ArrayRanges rg(req->sRange, req->resp.fileSize);
+        ArrayRanges rg(req->sRange, req->fileSize);
         if ((err = rg.error()))
         {
             print_err(req, "<%s:%d> Error create_ranges\n", __func__, __LINE__);
             return err;
         }
         
-        req->resp.numPart = rg.size();
-        req->resp.respStatus = RS206;
-        if (req->resp.numPart > 1)
+        req->numPart = rg.size();
+        req->respStatus = RS206;
+        if (req->numPart > 1)
         {
-            int size = conf->SNDBUF_SIZE;
+            int size = conf->SndBufSize;
             char *rd_buf = new(nothrow) char [size];
             if (!rd_buf)
             {
@@ -415,13 +411,13 @@ int send_file(Connect *req)
             delete [] rd_buf;
             return n;
         }
-        else if (req->resp.numPart == 1)
+        else if (req->numPart == 1)
         {
             Range *pr = rg.get(0);
             if (pr)
             {
-                req->resp.offset = pr->start;
-                req->resp.respContentLength = pr->len;
+                req->offset = pr->start;
+                req->respContentLength = pr->len;
                 if (req->reqMethod == M_HEAD)
                 {
                     if (send_response_headers(req, NULL))
@@ -441,9 +437,9 @@ int send_file(Connect *req)
     }
     else
     {
-        req->resp.respStatus = RS200;
-        req->resp.offset = 0;
-        req->resp.respContentLength = req->resp.fileSize;
+        req->respStatus = RS200;
+        req->offset = 0;
+        req->respContentLength = req->fileSize;
         if (req->reqMethod == M_HEAD)
         {
             if (send_response_headers(req, NULL))
@@ -467,13 +463,13 @@ int send_multypart(Connect *req, ArrayRanges& rg, char *rd_buf, int size)
     char buf[1024];
     Range *range;
     
-    for (int i = 0; (range = rg.get(i)) && (i < req->resp.numPart); ++i)
+    for (int i = 0; (range = rg.get(i)) && (i < req->numPart); ++i)
     {
         send_all_bytes += (range->len);
         send_all_bytes += create_multipart_head(req, range, buf, sizeof(buf));
     }
     send_all_bytes += snprintf(buf, sizeof(buf), "\r\n--%s--\r\n", boundary);
-    req->resp.respContentLength = send_all_bytes;
+    req->respContentLength = send_all_bytes;
 
     String hdrs(256);
     hdrs << "Content-Type: multipart/byteranges; boundary=" << boundary << "\r\n";
@@ -491,7 +487,7 @@ int send_multypart(Connect *req, ArrayRanges& rg, char *rd_buf, int size)
     
     send_all_bytes = 0;
     
-    for (int i = 0; (range = rg.get(i)) && (i < req->resp.numPart); ++i)
+    for (int i = 0; (range = rg.get(i)) && (i < req->numPart); ++i)
     {
         if ((n = create_multipart_head(req, range, buf, sizeof(buf))) == 0)
         {
@@ -516,7 +512,7 @@ int send_multypart(Connect *req, ArrayRanges& rg, char *rd_buf, int size)
         }
     }
 
-    req->resp.send_bytes = send_all_bytes;
+    req->send_bytes = send_all_bytes;
     snprintf(buf, sizeof(buf), "\r\n--%s--\r\n", boundary);
     n = write_to_client(req, buf, strlen(buf), conf->TimeOut);
     if (n < 0)
@@ -524,7 +520,7 @@ int send_multypart(Connect *req, ArrayRanges& rg, char *rd_buf, int size)
         print_err(req, "<%s:%d> Error: write_timeout() %lld bytes\n", __func__, __LINE__, send_all_bytes);
         return -1;
     }
-    req->resp.send_bytes += n;
+    req->send_bytes += n;
     return 0;
 }
 //======================================================================
@@ -537,9 +533,9 @@ int create_multipart_head(Connect *req, struct Range *ranges, char *buf, int len
     len_buf -= n;
     all += n;
 
-    if (req->resp.respContentType && (len_buf > 0))
+    if (req->respContentType && (len_buf > 0))
     {
-        n = snprintf(buf, len_buf, "Content-Type: %s\r\n", req->resp.respContentType);
+        n = snprintf(buf, len_buf, "Content-Type: %s\r\n", req->respContentType);
         buf += n;
         len_buf -= n;
         all += n;
@@ -551,7 +547,7 @@ int create_multipart_head(Connect *req, struct Range *ranges, char *buf, int len
     {
         n = snprintf(buf, len_buf,
             "Content-Range: bytes %lld-%lld/%lld\r\n\r\n",
-            ranges->start, ranges->end, req->resp.fileSize);
+            ranges->start, ranges->end, req->fileSize);
         buf += n;
         len_buf -= n;
         all += n;
@@ -564,7 +560,7 @@ int create_multipart_head(Connect *req, struct Range *ranges, char *buf, int len
 //======================================================================
 int options(Connect *req)
 {
-    req->resp.respStatus = RS200;
+    req->respStatus = RS200;
     if (send_response_headers(req, NULL))
     {
         return -1;

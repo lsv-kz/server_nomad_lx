@@ -3,10 +3,9 @@
 using namespace std;
 
 int sockServer;
-
 int Connect::serverSocket;
 int create_server_socket(const Config *c);
-void read_conf_file(const char *path_conf);
+int read_conf_file(const char *path_conf);
 //======================================================================
 static void signal_handler(int sig)
 {
@@ -30,9 +29,15 @@ pid_t create_child(int num_chld);
 int main(int argc, char *argv[])
 {
     if (argc == 1)
-        read_conf_file("./server.conf");
+    {
+        if (read_conf_file("./server.conf"))
+            return 1;
+    }
     else
-        read_conf_file(argv[1]);
+    {
+        if (read_conf_file(argv[1]))
+            return 1;
+    }
     
     signal(SIGPIPE, SIG_IGN);
 
@@ -47,36 +52,42 @@ int main(int argc, char *argv[])
     }
     //------------------------------------------------------------------
     cout << " [" << get_time().c_str() << "] - server \"" << conf->ServerSoftware.c_str() << "\" run\n"
-         << "\n   ip = " << conf->host.c_str()
-         << "\n   Port = " << conf->servPort.c_str()
+         << "\n   ServerAddr = " << conf->ServerAddr.c_str()
+         << "\n   ServerPort = " << conf->ServerPort.c_str()
          << "\n   ListenBacklog = " << conf->ListenBacklog
          << "\n   tcp_cork = " << conf->tcp_cork
-         << "\n   TcpNoDelay = " << conf->TcpNoDelay
-         << "\n   SndBufSize = " << conf->SNDBUF_SIZE
-         << "\n   SendFile = " << conf->SEND_FILE
-         << "\n   MaxRequests = " << conf->MAX_REQUESTS
-         << "\n   MaxEventSock = " << conf->MAX_EVENT_SOCK
+         << "\n   tcp_nodelay = " << conf->tcp_nodelay
+         << "\n   SndBufSize = " << conf->SndBufSize
+         << "\n   SendFile = " << conf->SendFile
+         
+         << "\n\n   OverMaxConnections = " << conf->OverMaxConnections
+         << "\n   MaxWorkConnections = " << conf->MaxWorkConnections
+         << "\n   MaxConnections = " << conf->MaxConnections
+         
+         << "\n\n   MaxEventConnections = " << conf->MaxEventConnections
          
          << "\n\n   NumProc = " << conf->NumProc
          << "\n   MaxThreads = " << conf->MaxThreads
          << "\n   MimThreads = " << conf->MinThreads
-         << "\n   MaxRequestsPerThr = " << conf->MaxRequestsPerThr
          << "\n   MaxCgiProc = " << conf->MaxCgiProc
          
-         << "\n\n   KeepAlive " << conf->KeepAlive
-         << "\n   TimeoutPoll = " << conf->TIMEOUT_POLL
+         << "\n\n   MaxRequestsPerClient = " << conf->MaxRequestsPerClient
          << "\n   TimeoutKeepAlive = " << conf->TimeoutKeepAlive
          << "\n   TimeOut = " << conf->TimeOut
          << "\n   TimeoutCGI = " << conf->TimeoutCGI
-         << "\n   MaxRanges = " << conf->MaxRanges
+         << "\n   TimeoutPoll = " << conf->TimeoutPoll
+         
          << "\n\n   UsePHP: " << conf->UsePHP.c_str()
          << "\n   PathPHP: " << conf->PathPHP.c_str()
-         << "\n   root_dir = " << conf->rootDir.c_str()
-         << "\n   cgi_dir = " << conf->cgiDir.c_str()
-         << "\n   log_dir = " << conf->logDir.c_str()
-         << "\n   ShowMediaFiles = " << conf->ShowMediaFiles
-         << "\n   ClientMaxBodySize = " << conf->ClientMaxBodySize
-         << "\n   index_html = " << conf->index_html
+         << "\n   DocumentRoot = " << conf->DocumentRoot.c_str()
+         << "\n   ScriptPath = " << conf->ScriptPath.c_str()
+         << "\n   LogPath = " << conf->LogPath.c_str()
+         
+         << "\n\n   MaxRanges = " << conf->MaxRanges
+         << "\n\n   ClientMaxBodySize = " << conf->ClientMaxBodySize
+         << "\n\n   ShowMediaFiles = " << conf->ShowMediaFiles
+         
+         << "\n\n   index_html = " << conf->index_html
          << "\n   index_php = " << conf->index_php
          << "\n   index_pl = " << conf->index_pl
          << "\n   index_fcgi = " << conf->index_fcgi

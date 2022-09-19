@@ -13,39 +13,39 @@ int send_response_headers(Connect *req, const String *hdrs)
         return -1;
     }
 
-    resp << get_str_http_prot(req->httpProt) << " " << status_resp(req->resp.respStatus) << "\r\n"
-        << "Date: " << req->resp.sLogTime << "\r\n"
+    resp << get_str_http_prot(req->httpProt) << " " << status_resp(req->respStatus) << "\r\n"
+        << "Date: " << req->sLogTime << "\r\n"
         << "Server: " << conf->ServerSoftware << "\r\n";
 
     if (req->reqMethod == M_OPTIONS)
         resp << "Allow: OPTIONS, GET, HEAD, POST\r\n";
 
-    if (req->resp.numPart == 1)
+    if (req->numPart == 1)
     {
-        if (req->resp.respContentType)
-            resp << "Content-Type: " << req->resp.respContentType << "\r\n";
-        resp << "Content-Length: " << req->resp.respContentLength << "\r\n";
+        if (req->respContentType)
+            resp << "Content-Type: " << req->respContentType << "\r\n";
+        resp << "Content-Length: " << req->respContentLength << "\r\n";
         
-        resp << "Content-Range: bytes " << req->resp.offset << "-" 
-                                        << (req->resp.offset + req->resp.respContentLength - 1) 
-                                        << "/" << req->resp.fileSize << "\r\n";
+        resp << "Content-Range: bytes " << req->offset << "-" 
+                                        << (req->offset + req->respContentLength - 1) 
+                                        << "/" << req->fileSize << "\r\n";
     }
-    else if (req->resp.numPart == 0)
+    else if (req->numPart == 0)
     {
-        if (req->resp.respContentType)
-            resp << "Content-Type: " << req->resp.respContentType << "\r\n";
-        if (req->resp.respContentLength >= 0)
+        if (req->respContentType)
+            resp << "Content-Type: " << req->respContentType << "\r\n";
+        if (req->respContentLength >= 0)
         {
-            resp << "Content-Length: " << req->resp.respContentLength << "\r\n";
-            if (req->resp.respStatus == RS200)
+            resp << "Content-Length: " << req->respContentLength << "\r\n";
+            if (req->respStatus == RS200)
                 resp << "Accept-Ranges: bytes\r\n";
         }
         
-        if (req->resp.respStatus == RS416)
-            resp << "Content-Range: bytes */" << req->resp.fileSize << "\r\n";
+        if (req->respStatus == RS416)
+            resp << "Content-Range: bytes */" << req->fileSize << "\r\n";
     }
 
-    if (req->resp.respStatus == RS101)
+    if (req->respStatus == RS101)
     {
         resp << "Upgrade: HTTP/1.1\r\n"
             << "Connection: Upgrade\r\n";
@@ -81,9 +81,9 @@ int send_response_headers(Connect *req, const String *hdrs)
 void send_message(Connect *req, const char *msg, const String *hdrs)
 {
     String html(256);
-    if ((req->resp.respStatus != RS204) && (req->reqMethod != M_HEAD))
+    if ((req->respStatus != RS204) && (req->reqMethod != M_HEAD))
     {
-        const char *title = status_resp(req->resp.respStatus);
+        const char *title = status_resp(req->respStatus);
         html << "<html>\r\n"
                 "<head>\r\n"
                 "<title>" << title << "</title>\r\n"
@@ -92,18 +92,18 @@ void send_message(Connect *req, const char *msg, const String *hdrs)
                 "<body>\r\n"
                 "<h3>" << title << "</h3>\r\n"
                 "<p>" << (msg ? msg : "") <<  "</p>\r\n"
-                "<hr>\r\n" << req->resp.sLogTime << "\r\n"
+                "<hr>\r\n" << req->sLogTime << "\r\n"
                 "</body>\r\n"
                 "</html>\r\n";
         
-        req->resp.respContentType = "text/html";
-        req->resp.respContentLength = html.size();
+        req->respContentType = "text/html";
+        req->respContentLength = html.size();
     }
 
-    if (req->resp.respStatus == RS204)
+    if (req->respStatus == RS204)
     {
-        req->resp.respContentLength = 0;
-        req->resp.respContentType = NULL;
+        req->respContentLength = 0;
+        req->respContentType = NULL;
     }
     
     req->connKeepAlive = 0;
@@ -111,13 +111,13 @@ void send_message(Connect *req, const char *msg, const String *hdrs)
     if ((req->httpProt != HTTP09) && send_response_headers(req, hdrs))
         return;
 
-    if ((req->reqMethod == M_HEAD) || (req->resp.respStatus == RS204))
+    if ((req->reqMethod == M_HEAD) || (req->respStatus == RS204))
         return;
 
-    if (req->resp.respContentLength > 0)
+    if (req->respContentLength > 0)
     {
-        req->resp.send_bytes = write_to_client(req, html.c_str(), req->resp.respContentLength, conf->TimeOut);
-        if (req->resp.send_bytes <= 0)
+        req->send_bytes = write_to_client(req, html.c_str(), req->respContentLength, conf->TimeOut);
+        if (req->send_bytes <= 0)
         {
             print_err(req, "<%s:%d> Error write_timeout()\n", __func__, __LINE__);
         }
