@@ -237,6 +237,7 @@ static void signal_handler_child(int sig)
     if (sig == SIGINT)
     {
         print_err("[%d] <%s:%d> ### SIGINT ### all_conn=%d\n", nProc, __func__, __LINE__, allConn);
+        close(servSock);
     }
     else if (sig == SIGSEGV)
     {
@@ -368,7 +369,7 @@ void manager(int sockServer, int numProc)
         req->numConn = ++allConn;
         req->numReq = 1;
         req->clientSocket = clientSocket;
-        req->timeout = conf->TimeOut;
+        req->timeout = conf->Timeout;
         n = getnameinfo((struct sockaddr *)&clientAddr,
                 addrSize,
                 req->remoteAddr,

@@ -46,42 +46,43 @@ void create_conf_file(const char *path)
     fprintf(f, "ServerSoftware   ?\n");
     fprintf(f, "ServerAddr   0.0.0.0\n");
     fprintf(f, "ServerPort   20000\n\n");
-    
+
     fprintf(f, "ListenBacklog 128\n");
     fprintf(f, "tcp_cork   n # y/n \n");
     fprintf(f, "tcp_nodelay   y \n\n");
-    
+
     fprintf(f, "DocumentRoot www/html\n");
     fprintf(f, "ScriptPath   www/cgi-bin\n");
     fprintf(f, "LogPath      www/logs\n\n");
-    
+    fprintf(f, "PidFilePath  www/pid\n\n");
+
     fprintf(f, "SendFile    y\n");
     fprintf(f, "SndBufSize  32768\n\n");
-    
+
     fprintf(f, "OverMaxConnections  1024\n");
     fprintf(f, "MaxWorkConnections   768\n\n");
-    
+
     fprintf(f, "MaxEventConnections  100\n\n");
-    
+
     fprintf(f, "NumProc 1\n");
     fprintf(f, "MaxThreads 300\n");
     fprintf(f, "MinThreads 6\n");
     fprintf(f, "MaxCgiProc 15\n\n");
-    
+
     fprintf(f, "MaxRequestsPerClient 10000\n");
     fprintf(f, "TimeoutKeepAlive 15\n");
-    fprintf(f, "TimeOut      120\n");
+    fprintf(f, "Timeout      120\n");
     fprintf(f, "TimeoutCGI    15\n\n");
     fprintf(f, "TimeoutPoll  100\n\n");
-    
+
     fprintf(f, "MaxRanges  5\n\n");
-    
+
     fprintf(f, "ClientMaxBodySize 10000000\n\n");
-    
+
     fprintf(f, " UsePHP     n  # php-fpm # php-cgi \n");
     fprintf(f, "# PathPHP   /usr/bin/php-cgi\n");
     fprintf(f, "# PathPHP  127.0.0.1:9000  #  /run/php/php7.0-fpm.sock \n\n");
-    
+
     fprintf(f, "AutoIndex   n\n");
     fprintf(f, "index {\n"
                 "\t#index.html\n"
@@ -92,7 +93,7 @@ void create_conf_file(const char *path)
                 "}\n\n");
 
     fprintf(f, "ShowMediaFiles  y #  y/n \n\n");
-    
+
     fprintf(f, "User nobody     # www-data\n");
     fprintf(f, "Group nogroup   # www-data\n");
 
@@ -291,6 +292,8 @@ int read_conf_file(const char *path_conf)
                 s2 >> c.ScriptPath;
             else if (s1 == "LogPath")
                 s2 >> c.LogPath;
+            else if (s1 == "PidFilePath")
+                s2 >> c.PidFilePath;
             else if ((s1 == "NumProc") && is_number(s2.c_str()))
                 s2 >> c.NumProc;
             else if ((s1 == "MaxThreads") && is_number(s2.c_str()))
@@ -303,8 +306,8 @@ int read_conf_file(const char *path_conf)
                 s2 >> c.MaxRequestsPerClient;
             else if ((s1 == "TimeoutKeepAlive") && is_number(s2.c_str()))
                 s2 >> c.TimeoutKeepAlive;
-            else if ((s1 == "TimeOut") && is_number(s2.c_str()))
-                s2 >> c.TimeOut;
+            else if ((s1 == "Timeout") && is_number(s2.c_str()))
+                s2 >> c.Timeout;
             else if ((s1 == "TimeoutCGI") && is_number(s2.c_str()))
                 s2 >> c.TimeoutCGI;
             else if ((s1 == "MaxRanges") && is_number(s2.c_str()))
@@ -408,19 +411,18 @@ int read_conf_file(const char *path_conf)
     }
 
     fclose(fconf);
-
+/*
     fcgi_list_addr *i = c.fcgi_list;
     for (; i; i = i->next)
     {
-        fprintf(stderr, "[%s] = [%s]\n", i->scrpt_name.c_str(), i->addr.c_str());
-    }
+        fprintf(stdout, "[%s] = [%s]\n", i->scrpt_name.c_str(), i->addr.c_str());
+    }*/
     //------------------------------------------------------------------
     if (check_path(c.LogPath) == -1)
     {
         fprintf(stderr, "!!! Error LogPath [%s]\n", c.LogPath.c_str());
         return -1;
     }
-    create_logfiles(c.LogPath, c.ServerSoftware);
     //------------------------------------------------------------------
     if (check_path(c.DocumentRoot) == -1)
     {
@@ -547,10 +549,10 @@ int set_max_fd(int max_open_fd)
     if (getrlimit(RLIMIT_NOFILE, &lim) == -1)
     {
         fprintf(stderr, "<%s:%d> Error getrlimit(RLIMIT_NOFILE): %s\n", __func__, __LINE__, strerror(errno));
+        return -1;
     }
     else
     {
-printf(" .rlim_cur=%ld, .rlim_max=%ld\n", (long)lim.rlim_cur, (long)lim.rlim_max);
         if (max_open_fd > (long)lim.rlim_cur)
         {
             if (max_open_fd > (long)lim.rlim_max)

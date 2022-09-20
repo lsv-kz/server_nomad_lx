@@ -114,7 +114,7 @@ int fcgi_(Connect *req, int fcgi_sock, FCGI_client & Fcgi)
         {
             char buf[4096];
             int rd = (req->req_hd.reqContentLength > (long long)sizeof(buf)) ? sizeof(buf) : (int)req->req_hd.reqContentLength;
-            int ret = read_timeout(req->clientSocket, buf, rd, conf->TimeOut);
+            int ret = read_timeout(req->clientSocket, buf, rd, conf->Timeout);
             if (ret < 0)
             {
                 print_err(req, "<%s:%d> Error: reaf_from_client()\n", __func__, __LINE__);

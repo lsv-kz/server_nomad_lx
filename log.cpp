@@ -3,10 +3,10 @@
 
 using namespace std;
 
-int flog, flog_err;
+int flog = STDOUT_FILENO, flog_err = STDERR_FILENO;
 mutex mtxLog;
 //======================================================================
-void create_logfiles(const String & log_dir, const String& ServerSoftware)
+void create_logfiles(const String & log_dir)
 {
     char buf[256];
     struct tm tm1;
@@ -17,8 +17,7 @@ void create_logfiles(const String & log_dir, const String& ServerSoftware)
     strftime(buf, sizeof(buf), "%Y-m%m-%d_%Hh%Mm%Ss", &tm1);
 
     String fileName;
-    fileName.reserve(log_dir.size() + strlen(buf) + ServerSoftware.size() + 16);
-    fileName << log_dir << '/' << buf << '-' << ServerSoftware << ".log";
+    fileName << log_dir << '/' << buf << '-' << conf->ServerSoftware << ".log";
 
     flog = open(fileName.c_str(), O_CREAT | O_TRUNC | O_WRONLY, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
     if(flog == -1)
@@ -26,37 +25,17 @@ void create_logfiles(const String & log_dir, const String& ServerSoftware)
         cerr << "  Error create log: " << fileName.c_str() << "\n";
         exit(1);
     }
-/*
-    struct flock flck;
-    flck.l_type = F_WRLCK;
-    flck.l_whence = SEEK_SET;
-    flck.l_start = 0;
-    flck.l_len = 0;
-    fcntl(flog, F_SETLK, &flck);
-
-    flock(flog, LOCK_SH); //   LOCK_EX
-*/  
-//   lockf(flog, F_LOCK, 0);
     //------------------------------------------------------------------
     fileName.clear();
-    fileName << log_dir << "/" << ServerSoftware << "-error.log";
+    fileName << log_dir << "/" << buf << '-' << conf->ServerSoftware << "-error.log";
     
-    flog_err = open(fileName.c_str(), O_CREAT | O_TRUNC | O_WRONLY, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH); //   O_APPEND 
+    flog_err = open(fileName.c_str(), O_CREAT | O_TRUNC | O_WRONLY, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH); //  O_APPEND 
     if(flog_err == -1)
     {
         cerr << "  Error create log_err: " << fileName.c_str() << "\n";
         exit(1);
     }
-/*
-    flck.l_type = F_WRLCK;
-    flck.l_whence = SEEK_SET;
-    flck.l_start = 0;
-    flck.l_len = 0;
-    fcntl(flog_err, F_SETLK, &flck);
 
-    flock(flog_err, LOCK_SH); //   LOCK_EX
-*/  
-//   lockf(flog_err, F_LOCK, 0);
     dup2(flog_err, STDERR_FILENO);
 }
 //======================================================================

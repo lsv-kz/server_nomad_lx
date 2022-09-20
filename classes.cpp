@@ -59,7 +59,7 @@ int Connect::hd_read()
 int Connect::empty_line()
 {
     if (err) return -1;
-    timeout = conf->TimeOut;
+    timeout = conf->Timeout;
     char *pr, *pn, ch;
     while (lenTail > 0)
     {

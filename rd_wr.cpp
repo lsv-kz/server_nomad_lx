@@ -162,7 +162,7 @@ int client_to_script(Connect *req, int fd_out, long long *cont_len)
     {
         rd = (*cont_len > (int)sizeof(buf)) ? (int)sizeof(buf) : *cont_len;
         
-        ret = read_timeout(req->clientSocket, buf, rd, conf->TimeOut);
+        ret = read_timeout(req->clientSocket, buf, rd, conf->Timeout);
         if (ret == -1)
         {
             return -1;
@@ -187,7 +187,7 @@ void client_to_cosmos(Connect *req, long long *size)
 
     for (; *size > 0; )
     {
-        rd = read_timeout(req->clientSocket, buf, (*size > (int)sizeof(buf)) ? (int)sizeof(buf) : *size, conf->TimeOut);
+        rd = read_timeout(req->clientSocket, buf, (*size > (int)sizeof(buf)) ? (int)sizeof(buf) : *size, conf->Timeout);
         if (rd == -1)
         {
             if (errno == EINTR)
@@ -292,7 +292,7 @@ int fcgi_read_stderr(int fd_in, int cont_len, int timeout)
 
     for ( ; cont_len > 0; )
     {
-        rd = read_timeout(fd_in, buf, cont_len > (int)sizeof(buf) ? (int)sizeof(buf) : cont_len, conf->TimeOut);
+        rd = read_timeout(fd_in, buf, cont_len > (int)sizeof(buf) ? (int)sizeof(buf) : cont_len, conf->Timeout);
         if (rd == -1)
         {
             print_err("<%s:%d> Error read_timeout()=%d\n", __func__, __LINE__, rd);
@@ -335,7 +335,7 @@ int send_largefile(Connect *req, char *buf, int size, off_t offset, long long *c
         else if (rd == 0)
             break;
 
-        wr = write_to_client(req, buf, rd, conf->TimeOut);
+        wr = write_to_client(req, buf, rd, conf->Timeout);
         if (wr != rd)
         {
             print_err(req, "<%s:%d> Error write_to_sock()=%d, %d\n", __func__, __LINE__, wr, rd);

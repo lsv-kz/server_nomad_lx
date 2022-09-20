@@ -118,7 +118,7 @@ struct Config
 
     int MaxRequestsPerClient;
     int TimeoutKeepAlive;
-    int TimeOut;
+    int Timeout;
     int TimeoutCGI;
     int TimeoutPoll;
 
@@ -322,7 +322,7 @@ int parse_startline_request(Connect *req, char *s);
 int parse_headers(Connect *req, char *s, int n);
 const char *str_err(int i);
 //----------------------------------------------------------------------
-void create_logfiles(const String &, const String &);
+void create_logfiles(const String &);
 void close_logs(void);
 void print_err(Connect *req, const char *format, ...);
 void print_log(Connect *req);
