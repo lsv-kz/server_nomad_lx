@@ -5,6 +5,7 @@ void Connect::init()
 {
     sRange = NULL;
     //------------------------------------
+    decodeUri[0] = 0;
     uri = NULL;
     p_newline = bufReq;
     tail = NULL;
@@ -34,8 +35,12 @@ void Connect::init()
 int Connect::hd_read()
 {
     errno = 0;
-    if (err) return -1;
-    int n = recv(clientSocket, bufReq + i_bufReq, LEN_BUF_REQUEST - i_bufReq - 1, 0);
+    if (err)
+        return -1;
+    int len = LEN_BUF_REQUEST - i_bufReq - 1;
+    if (len <= 0)
+        return -RS414;
+    int n = recv(clientSocket, bufReq + i_bufReq, len, 0);
     if (n < 0)
         return -1;
     else if (n == 0)

@@ -6,8 +6,6 @@ int create_server_socket(const Config *conf)
 {
     int sockfd;
     const int sock_opt = 1;
-    socklen_t optlen;
-    int sndbuf = 0;
     struct sockaddr_in server_sockaddr;
     
     sockfd = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
@@ -34,12 +32,13 @@ int create_server_socket(const Config *conf)
         }
     }
     //------------------------------------------------------------------
-    optlen = sizeof(sndbuf);
+    /*socklen_t optlen = sizeof(sndbuf);
+    int sndbuf;
     if (!getsockopt(sockfd, SOL_SOCKET, SO_SNDBUF, (void *)&sndbuf, &optlen))
     {
         printf("<%s:%d> SndBufSize=%d\n", __func__, __LINE__, conf->SndBufSize);
         printf("<%s:%d> SO_SNDBUF=%d\n", __func__, __LINE__, sndbuf);
-    }
+    }*/
     //------------------------------------------------------------------
     memset(&server_sockaddr, 0, sizeof server_sockaddr);
     server_sockaddr.sin_family = PF_INET;

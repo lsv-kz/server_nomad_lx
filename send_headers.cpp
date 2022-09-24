@@ -81,6 +81,10 @@ int send_response_headers(Connect *req, const String *hdrs)
 void send_message(Connect *req, const char *msg, const String *hdrs)
 {
     String html(256);
+
+    if (req->httpProt == 0)
+        req->httpProt = HTTP11;
+
     if ((req->respStatus != RS204) && (req->reqMethod != M_HEAD))
     {
         const char *title = status_resp(req->respStatus);
@@ -95,7 +99,7 @@ void send_message(Connect *req, const char *msg, const String *hdrs)
                 "<hr>\r\n" << req->sLogTime << "\r\n"
                 "</body>\r\n"
                 "</html>\r\n";
-        
+
         req->respContentType = "text/html";
         req->respContentLength = html.size();
     }
@@ -105,7 +109,7 @@ void send_message(Connect *req, const char *msg, const String *hdrs)
         req->respContentLength = 0;
         req->respContentType = NULL;
     }
-    
+
     req->connKeepAlive = 0;
 
     if ((req->httpProt != HTTP09) && send_response_headers(req, hdrs))

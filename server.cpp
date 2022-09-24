@@ -78,149 +78,11 @@ void print_limits()
         printf(" RLIMIT_NOFILE: cur=%ld, max=%ld\n", (long)lim.rlim_cur, (long)lim.rlim_max);
 }
 //======================================================================
-int main(int argc, char *argv[])
+void print_config()
 {
-    signal(SIGPIPE, SIG_IGN);
-    if (argc == 1)
-        conf_path = "server.conf";
-    else
-    {
-        int c;
-        pid_t pid_ = 0;
-        char *sig = NULL, *conf_dir_ = NULL;
-        while ((c = getopt(argc, argv, "c:s:h:l")) != -1)
-        {
-            switch (c)
-            {
-                case 'c':
-                    conf_dir_ = optarg;
-                    break;
-                case 's':
-                    sig = optarg;
-                    break;
-                case 'h':
-                    print_help(argv[0]);
-                    exit(0);
-                case 'l':
-                    print_limits();
-                    exit(0);
-                default:
-                    print_help(argv[0]);
-                    exit(0);
-            }
-        }
-
-        if (conf_dir_)
-            conf_path = conf_dir_;
-        else
-            conf_path = "server.conf";
-
-        if (sig)
-        {
-            if (read_conf_file(conf_path.c_str()))
-                return 1;
-            pidFile = conf->PidFilePath;
-            pidFile << "/pid.txt";
-            FILE *fpid = fopen(pidFile.c_str(), "r");
-            if (!fpid)
-            {
-                fprintf(stderr, "<%s:%d> Error open PidFile(%s): %s\n", __func__, __LINE__, pidFile.c_str(), strerror(errno));
-                exit(1);
-            }
-
-            fscanf(fpid, "%u", &pid_);
-            fclose(fpid);
-
-            if (!strcmp(sig, "restart"))
-            {
-                kill(pid_, SIGUSR1);
-            }
-            else if (!strcmp(sig, "close"))
-                kill(pid_, SIGUSR2);
-            else
-            {
-                fprintf(stderr, "<%d> ? option -s: %s\n", __LINE__, sig);
-                print_help(argv[0]);
-                exit(1);
-            }
-
-            exit(0);
-        }
-    }
-
-    while (run)
-    {
-        run = 0;
-
-        if (read_conf_file(conf_path.c_str()))
-            return 1;
-
-        pidFile = conf->PidFilePath;
-        pidFile << "/pid.txt";
-        FILE *fpid = fopen(pidFile.c_str(), "w");
-        if (!fpid)
-        {
-            fprintf(stderr, "<%s:%d> Error open PidFile(%s): %s\n", __func__, __LINE__, pidFile.c_str(), strerror(errno));
-            return -1;
-        }
-
-        fprintf(fpid, "%u\n", getpid());
-        fclose(fpid);
-
-        sockServer = create_server_socket(conf);
-        if (sockServer == -1)
-        {
-            fprintf(stderr, "<%s:%d> Error: create_server_socket(%s:%s)\n", __func__, __LINE__, 
-                        conf->ServerAddr.c_str(), conf->ServerPort.c_str());
-            exit(1);
-        }
-
-        Connect::serverSocket = sockServer;
-        
-        if (start == 0)
-        {
-            start = 1;
-            set_uid();
-
-            if (signal(SIGINT, signal_handler) == SIG_ERR)
-            {
-                fprintf(stderr, "<%s:%d> Error signal(SIGINT): %s\n", __func__, __LINE__, strerror(errno));
-                exit(EXIT_FAILURE);
-            }
-
-            if (signal(SIGSEGV, signal_handler) == SIG_ERR)
-            {
-                fprintf(stderr, "<%s:%d> Error signal(SIGSEGV): %s\n", __func__, __LINE__, strerror(errno));
-                exit(EXIT_FAILURE);
-            }
-
-            if (signal(SIGUSR1, signal_handler) == SIG_ERR)
-            {
-                fprintf(stderr, "<%s:%d> Error signal(SIGUSR1): %s\n", __func__, __LINE__, strerror(errno));
-                exit(EXIT_FAILURE);
-            }
-
-            if (signal(SIGUSR2, signal_handler) == SIG_ERR)
-            {
-                fprintf(stderr, "<%s:%d> Error signal(SIGUSR2): %s\n", __func__, __LINE__, strerror(errno));
-                exit(EXIT_FAILURE);
-            }
-        }
-
-        if (main_proc())
-            break;
-    }
-
-    return 0;
-}
-//======================================================================
-int main_proc()
-{
-    create_logfiles(conf->LogPath);
-    pid_t pid = getpid();
-    //------------------------------------------------------------------
-    cout << " [" << get_time().c_str() << "] - server \"" << conf->ServerSoftware.c_str() << "\" run"
-         << "\n   ServerAddr = " << conf->ServerAddr.c_str()
+    print_limits();
+    
+    cout << "   ServerAddr = " << conf->ServerAddr.c_str()
          << "\n   ServerPort = " << conf->ServerPort.c_str()
          << "\n   ListenBacklog = " << conf->ListenBacklog
          << "\n   tcp_cork = " << conf->tcp_cork
@@ -246,12 +108,6 @@ int main_proc()
          << "\n   TimeoutCGI = " << conf->TimeoutCGI
          << "\n   TimeoutPoll = " << conf->TimeoutPoll
 
-         << "\n\n   DocumentRoot = " << conf->DocumentRoot.c_str()
-         << "\n   ScriptPath = " << conf->ScriptPath.c_str()
-         << "\n   LogPath = " << conf->LogPath.c_str()
-         << "\n   UsePHP: " << conf->UsePHP.c_str()
-         << "\n   PathPHP: " << conf->PathPHP.c_str()
-
          << "\n\n   MaxRanges = " << conf->MaxRanges
 
          << "\n\n   ClientMaxBodySize = " << conf->ClientMaxBodySize
@@ -262,11 +118,174 @@ int main_proc()
          << "\n   index_php = " << conf->index_php
          << "\n   index_pl = " << conf->index_pl
          << "\n   index_fcgi = " << conf->index_fcgi
-         << "\n\n";
+         << "\n\n   DocumentRoot = " << conf->DocumentRoot.c_str()
+         << "\n   ScriptPath = " << conf->ScriptPath.c_str()
+         << "\n   LogPath = " << conf->LogPath.c_str()
+         << "\n\n   UsePHP: " << conf->UsePHP.c_str()
+         << "\n   PathPHP: " << conf->PathPHP.c_str()
+         << "\n";
+         
+    cout << "   ------------- FastCGI -------------\n";
+    fcgi_list_addr *i = conf->fcgi_list;
+    for (; i; i = i->next)
+    {
+        cout << "[" << i->scrpt_name.c_str() << " : " << i->addr.c_str() << "]\n";
+    }
+    
+}
+//======================================================================
+int main(int argc, char *argv[])
+{
+    signal(SIGPIPE, SIG_IGN);
+    if (argc == 1)
+        conf_path = "server.conf";
+    else
+    {
+        int c, arg_print = 0;
+        pid_t pid_ = 0;
+        char *sig = NULL, *conf_dir_ = NULL;
+        while ((c = getopt(argc, argv, "c:s:h:p")) != -1)
+        {
+            switch (c)
+            {
+                case 'c':
+                    conf_dir_ = optarg;
+                    break;
+                case 's':
+                    sig = optarg;
+                    break;
+                case 'h':
+                    print_help(argv[0]);
+                    return 0;
+                case 'p':
+                    arg_print = 1;
+                    break;
+                default:
+                    print_help(argv[0]);
+                    return 0;
+            }
+        }
 
-    cerr << "   uid=" << getuid() << "; gid=" << getgid() << "\n\n";
-    cout << "   uid=" << getuid() << "; gid=" << getgid() << "\n\n";
-    cout << "   pid main proc: "  << pid <<  "\n";
+        if (conf_dir_)
+            conf_path = conf_dir_;
+        else
+            conf_path = "server.conf";
+
+        if (arg_print)
+        {
+            if (read_conf_file(conf_path.c_str()))
+                return 1;
+            print_config();
+            return 0;
+        }
+
+        if (sig)
+        {
+            if (read_conf_file(conf_path.c_str()))
+                return 1;
+            pidFile = conf->PidFilePath;
+            pidFile << "/pid.txt";
+            FILE *fpid = fopen(pidFile.c_str(), "r");
+            if (!fpid)
+            {
+                fprintf(stderr, "<%s:%d> Error open PidFile(%s): %s\n", __func__, __LINE__, pidFile.c_str(), strerror(errno));
+                return 1;
+            }
+
+            fscanf(fpid, "%u", &pid_);
+            fclose(fpid);
+
+            if (!strcmp(sig, "restart"))
+            {
+                kill(pid_, SIGUSR1);
+            }
+            else if (!strcmp(sig, "close"))
+                kill(pid_, SIGUSR2);
+            else
+            {
+                fprintf(stderr, "<%d> ? option -s: %s\n", __LINE__, sig);
+                print_help(argv[0]);
+                return 1;
+            }
+
+            return 01;
+        }
+    }
+
+    while (run)
+    {
+        run = 0;
+
+        if (read_conf_file(conf_path.c_str()))
+            return 1;
+
+        pidFile = conf->PidFilePath;
+        pidFile << "/pid.txt";
+        FILE *fpid = fopen(pidFile.c_str(), "w");
+        if (!fpid)
+        {
+            fprintf(stderr, "<%s:%d> Error open PidFile(%s): %s\n", __func__, __LINE__, pidFile.c_str(), strerror(errno));
+            return 1;
+        }
+
+        fprintf(fpid, "%u\n", getpid());
+        fclose(fpid);
+
+        sockServer = create_server_socket(conf);
+        if (sockServer == -1)
+        {
+            fprintf(stderr, "<%s:%d> Error: create_server_socket(%s:%s)\n", __func__, __LINE__, 
+                        conf->ServerAddr.c_str(), conf->ServerPort.c_str());
+            return 1;
+        }
+
+        Connect::serverSocket = sockServer;
+        
+        if (start == 0)
+        {
+            start = 1;
+            set_uid();
+
+            if (signal(SIGINT, signal_handler) == SIG_ERR)
+            {
+                fprintf(stderr, "<%s:%d> Error signal(SIGINT): %s\n", __func__, __LINE__, strerror(errno));
+                return 1;
+            }
+
+            if (signal(SIGSEGV, signal_handler) == SIG_ERR)
+            {
+                fprintf(stderr, "<%s:%d> Error signal(SIGSEGV): %s\n", __func__, __LINE__, strerror(errno));
+                return 1;
+            }
+
+            if (signal(SIGUSR1, signal_handler) == SIG_ERR)
+            {
+                fprintf(stderr, "<%s:%d> Error signal(SIGUSR1): %s\n", __func__, __LINE__, strerror(errno));
+                return 1;
+            }
+
+            if (signal(SIGUSR2, signal_handler) == SIG_ERR)
+            {
+                fprintf(stderr, "<%s:%d> Error signal(SIGUSR2): %s\n", __func__, __LINE__, strerror(errno));
+                return 1;
+            }
+        }
+
+        if (main_proc())
+            break;
+    }
+
+    return 0;
+}
+//======================================================================
+int main_proc()
+{
+    create_logfiles(conf->LogPath);
+    pid_t pid = getpid();
+    //------------------------------------------------------------------
+    cout << "\n[" << get_time().c_str() << "] - server \"" << conf->ServerSoftware.c_str() << "\" run\n";
+    cerr << "   pid="  << pid << "; uid=" << getuid() << "; gid=" << getgid() << "\n";
+    cout << "   pid="  << pid << "; uid=" << getuid() << "; gid=" << getgid() << "\n";
     //------------------------------------------------------------------
     for ( ; environ[0]; )
     {

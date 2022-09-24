@@ -43,12 +43,12 @@ void create_conf_file(const char *path)
         exit(1);
     }
 
-    fprintf(f, "ServerSoftware   ?\n");
-    fprintf(f, "ServerAddr   0.0.0.0\n");
-    fprintf(f, "ServerPort   20000\n\n");
+    fprintf(f, "ServerSoftware  ?\n");
+    fprintf(f, "ServerAddr      0.0.0.0\n");
+    fprintf(f, "ServerPort      8080\n\n");
 
     fprintf(f, "ListenBacklog 128\n");
-    fprintf(f, "tcp_cork   n # y/n \n");
+    fprintf(f, "tcp_cork      n # y/n \n");
     fprintf(f, "tcp_nodelay   y \n\n");
 
     fprintf(f, "DocumentRoot www/html\n");
@@ -79,9 +79,8 @@ void create_conf_file(const char *path)
 
     fprintf(f, "ClientMaxBodySize 10000000\n\n");
 
-    fprintf(f, " UsePHP     n  # php-fpm # php-cgi \n");
-    fprintf(f, "# PathPHP   /usr/bin/php-cgi\n");
-    fprintf(f, "# PathPHP  127.0.0.1:9000  #  /run/php/php7.0-fpm.sock \n\n");
+    fprintf(f, " UsePHP     n  # [n, php-fpm, php-cgi]\n");
+    fprintf(f, "# PathPHP  127.0.0.1:9000  #  [php-fpm: 127.0.0.1:9000 (/var/run/php-fpm.sock), php-cgi: /usr/bin/php-cgi]\n\n");
 
     fprintf(f, "AutoIndex   n\n");
     fprintf(f, "index {\n"
@@ -94,8 +93,8 @@ void create_conf_file(const char *path)
 
     fprintf(f, "ShowMediaFiles  y #  y/n \n\n");
 
-    fprintf(f, "User nobody     # www-data\n");
-    fprintf(f, "Group nogroup   # www-data\n");
+    fprintf(f, "User   root\n");
+    fprintf(f, "Group  www-data\n");
 
     fclose(f);
 }
@@ -411,12 +410,6 @@ int read_conf_file(const char *path_conf)
     }
 
     fclose(fconf);
-/*
-    fcgi_list_addr *i = c.fcgi_list;
-    for (; i; i = i->next)
-    {
-        fprintf(stdout, "[%s] = [%s]\n", i->scrpt_name.c_str(), i->addr.c_str());
-    }*/
     //------------------------------------------------------------------
     if (check_path(c.LogPath) == -1)
     {
@@ -472,7 +465,7 @@ int read_conf_file(const char *path_conf)
         c.MaxConnections = n;
         c.MaxWorkConnections = n;
     }
-    fprintf(stderr, "<%s:%d> max_fd=%d\n", __func__, __LINE__, n);
+    //fprintf(stderr, "<%s:%d> max_fd=%d\n", __func__, __LINE__, n);
 
     return 0;
 }
@@ -570,6 +563,6 @@ int set_max_fd(int max_open_fd)
             }
         }
     }
-    fprintf(stderr, "<%s:%d> max_open_fd=%d\n", __func__, __LINE__, max_open_fd);
+    //fprintf(stderr, "<%s:%d> max_open_fd=%d\n", __func__, __LINE__, max_open_fd);
     return max_open_fd;
 }

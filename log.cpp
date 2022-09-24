@@ -14,7 +14,7 @@ void create_logfiles(const String & log_dir)
 
     time(&t1);
     tm1 = *localtime(&t1);
-    strftime(buf, sizeof(buf), "%Y-m%m-%d_%Hh%Mm%Ss", &tm1);
+    strftime(buf, sizeof(buf), "%Y-%m-%d_%Hh%Mm%Ss", &tm1);
 
     String fileName;
     fileName << log_dir << '/' << buf << '-' << conf->ServerSoftware << ".log";
@@ -81,14 +81,21 @@ void print_log(Connect *req)
 {
     String ss(320);
     if (req->reqMethod <= 0)
-        return;
-    ss  << req->numProc << "/" << req->numConn << "/" << req->numReq << " - " << req->remoteAddr
-        << " - [" << req->sLogTime << "] - \"" << get_str_method(req->reqMethod) << " " << req->decodeUri
-        << ((req->sReqParam) ? "?" : "") << ((req->sReqParam) ? req->sReqParam : "") << " "
-        << get_str_http_prot(req->httpProt) << "\" "
-        << req->respStatus << " " << req->send_bytes << " "
-        << "\"" << ((req->req_hd.iReferer >= 0) ? req->reqHdValue[req->req_hd.iReferer] : "-") << "\" "
-        << "\"" << ((req->req_hd.iUserAgent >= 0) ? req->reqHdValue[req->req_hd.iUserAgent] : "-") << "\"\n";
+    {
+        ss  << req->numProc << "/" << req->numConn << "/" << req->numReq << " - " << req->remoteAddr
+            << " - [" << req->sLogTime << "] - \"-\" "
+            << req->respStatus << " " << req->send_bytes << " \"-\" \"-\"\n";
+    }
+    else
+    {
+        ss  << req->numProc << "/" << req->numConn << "/" << req->numReq << " - " << req->remoteAddr
+            << " - [" << req->sLogTime << "] - \"" << get_str_method(req->reqMethod) << " " << req->decodeUri
+            << ((req->sReqParam) ? "?" : "") << ((req->sReqParam) ? req->sReqParam : "") << " "
+            << get_str_http_prot(req->httpProt) << "\" "
+            << req->respStatus << " " << req->send_bytes << " "
+            << "\"" << ((req->req_hd.iReferer >= 0) ? req->reqHdValue[req->req_hd.iReferer] : "-") << "\" "
+            << "\"" << ((req->req_hd.iUserAgent >= 0) ? req->reqHdValue[req->req_hd.iUserAgent] : "-") << "\"\n";
+    }
 //mtxLog.lock();
     write(flog, ss.c_str(), ss.size());
 //mtxLog.unlock();
