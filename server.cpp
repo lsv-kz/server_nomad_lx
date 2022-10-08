@@ -82,54 +82,57 @@ void print_config()
 {
     print_limits();
     
-    cout << "   ServerAddr = " << conf->ServerAddr.c_str()
-         << "\n   ServerPort = " << conf->ServerPort.c_str()
-         << "\n   ListenBacklog = " << conf->ListenBacklog
-         << "\n   tcp_cork = " << conf->tcp_cork
-         << "\n   tcp_nodelay = " << conf->tcp_nodelay
+    cout << "   ServerSoftware       : " << conf->ServerSoftware.c_str()
+         << "\n\n   ServerAddr           : " << conf->ServerAddr.c_str()
+         << "\n   ServerPort           : " << conf->ServerPort.c_str()
+         << "\n\n   ListenBacklog        : " << conf->ListenBacklog
+         << "\n   tcp_cork             : " << conf->tcp_cork
+         << "\n   tcp_nodelay          : " << conf->tcp_nodelay
 
-         << "\n\n   SndBufSize = " << conf->SndBufSize
-         << "\n   SendFile = " << conf->SendFile
+         << "\n\n   SndBufSize           : " << conf->SndBufSize
+         << "\n   SendFile             : " << conf->SendFile
 
-         << "\n\n   OverMaxConnections = " << conf->OverMaxConnections
-         << "\n   MaxWorkConnections = " << conf->MaxWorkConnections
-         << "\n   MaxConnections = " << conf->MaxConnections
+         << "\n\n   OverMaxConnections   : " << conf->OverMaxConnections
+         << "\n   MaxWorkConnections   : " << conf->MaxWorkConnections
+         << "\n   MaxConnections       : " << conf->MaxConnections
 
-         << "\n\n   MaxEventConnections = " << conf->MaxEventConnections
+         << "\n\n   MaxEventConnections  : " << conf->MaxEventConnections
 
-         << "\n\n   NumProc = " << conf->NumProc
-         << "\n   MaxThreads = " << conf->MaxThreads
-         << "\n   MimThreads = " << conf->MinThreads
-         << "\n   MaxCgiProc = " << conf->MaxCgiProc
+         << "\n\n   NumProc              : " << conf->NumProc
+         << "\n   MaxThreads           : " << conf->MaxThreads
+         << "\n   MimThreads           : " << conf->MinThreads
+         << "\n   MaxCgiProc           : " << conf->MaxCgiProc
 
-         << "\n\n   MaxRequestsPerClient = " << conf->MaxRequestsPerClient
-         << "\n   TimeoutKeepAlive = " << conf->TimeoutKeepAlive
-         << "\n   Timeout = " << conf->Timeout
-         << "\n   TimeoutCGI = " << conf->TimeoutCGI
-         << "\n   TimeoutPoll = " << conf->TimeoutPoll
+         << "\n\n   MaxRequestsPerClient : " << conf->MaxRequestsPerClient
+         << "\n   TimeoutKeepAlive     : " << conf->TimeoutKeepAlive
+         << "\n   Timeout              : " << conf->Timeout
+         << "\n   TimeoutCGI           : " << conf->TimeoutCGI
+         << "\n   TimeoutPoll          : " << conf->TimeoutPoll
 
-         << "\n\n   MaxRanges = " << conf->MaxRanges
+         << "\n\n   MaxRanges            : " << conf->MaxRanges
 
-         << "\n\n   ClientMaxBodySize = " << conf->ClientMaxBodySize
+         << "\n\n   ClientMaxBodySize    : " << conf->ClientMaxBodySize
 
-         << "\n\n   ShowMediaFiles = " << conf->ShowMediaFiles
+         << "\n\n   ShowMediaFiles       : " << conf->ShowMediaFiles
 
-         << "\n\n   index_html = " << conf->index_html
-         << "\n   index_php = " << conf->index_php
-         << "\n   index_pl = " << conf->index_pl
-         << "\n   index_fcgi = " << conf->index_fcgi
-         << "\n\n   DocumentRoot = " << conf->DocumentRoot.c_str()
-         << "\n   ScriptPath = " << conf->ScriptPath.c_str()
-         << "\n   LogPath = " << conf->LogPath.c_str()
-         << "\n\n   UsePHP: " << conf->UsePHP.c_str()
-         << "\n   PathPHP: " << conf->PathPHP.c_str()
+         << "\n\n   index_html           : " << conf->index_html
+         << "\n   index_php            : " << conf->index_php
+         << "\n   index_pl             : " << conf->index_pl
+         << "\n   index_fcgi           : " << conf->index_fcgi
+         << "\n\n   DocumentRoot         : " << conf->DocumentRoot.c_str()
+         << "\n   ScriptPath           : " << conf->ScriptPath.c_str()
+         << "\n   LogPath              : " << conf->LogPath.c_str()
+         << "\n\n   UsePHP               : " << conf->UsePHP.c_str()
+         << "\n   PathPHP              : " << conf->PathPHP.c_str()
+         << "\n\n   User                 : " << conf->user.c_str()
+         << "\n   Group                : " << conf->group.c_str()
          << "\n";
          
     cout << "   ------------- FastCGI -------------\n";
     fcgi_list_addr *i = conf->fcgi_list;
     for (; i; i = i->next)
     {
-        cout << "[" << i->scrpt_name.c_str() << " : " << i->addr.c_str() << "]\n";
+        cout << "   [" << i->scrpt_name.c_str() << " : " << i->addr.c_str() << "]\n";
     }
     
 }
@@ -196,9 +199,7 @@ int main(int argc, char *argv[])
             fclose(fpid);
 
             if (!strcmp(sig, "restart"))
-            {
                 kill(pid_, SIGUSR1);
-            }
             else if (!strcmp(sig, "close"))
                 kill(pid_, SIGUSR2);
             else
@@ -283,7 +284,7 @@ int main_proc()
     create_logfiles(conf->LogPath);
     pid_t pid = getpid();
     //------------------------------------------------------------------
-    cout << "\n[" << get_time().c_str() << "] - server \"" << conf->ServerSoftware.c_str() << "\" run\n";
+    cout << "\n[" << get_time().c_str() << "] - server \"" << conf->ServerSoftware.c_str() << "\" run port: " << conf->ServerPort.c_str() << "\n";
     cerr << "   pid="  << pid << "; uid=" << getuid() << "; gid=" << getgid() << "\n";
     cout << "   pid="  << pid << "; uid=" << getuid() << "; gid=" << getgid() << "\n";
     //------------------------------------------------------------------

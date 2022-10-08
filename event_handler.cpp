@@ -169,7 +169,7 @@ mtx_.unlock();
         
         if (((t - r->sock_timer) >= r->timeout) && (r->sock_timer != 0))
         {
-            if (r->reqMethod)
+            if (r->lenBufReq)
             {
                 r->err = -1;
                 print_err(r, "<%s:%d> Timeout = %ld\n", __func__, __LINE__, t - r->sock_timer);

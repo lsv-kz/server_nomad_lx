@@ -12,7 +12,7 @@ void Connect::init()
     //------------------------------------
     err = 0;
     lenTail = 0;
-    i_bufReq = 0;
+    lenBufReq = 0;
     countReqHeaders = 0;
     reqMethod = 0;
     httpProt = 0;
@@ -37,23 +37,23 @@ int Connect::hd_read()
     errno = 0;
     if (err)
         return -1;
-    int len = LEN_BUF_REQUEST - i_bufReq - 1;
+    int len = SIZE_BUF_REQUEST - lenBufReq - 1;
     if (len <= 0)
         return -RS414;
-    int n = recv(clientSocket, bufReq + i_bufReq, len, 0);
+    int n = recv(clientSocket, bufReq + lenBufReq, len, 0);
     if (n < 0)
         return -1;
     else if (n == 0)
         return NO_PRINT_LOG;
 
     lenTail += n;
-    i_bufReq += n;
-    bufReq[i_bufReq] = 0;
+    lenBufReq += n;
+    bufReq[lenBufReq] = 0;
 
     n = empty_line();
     if (n == 1)
     {
-        return i_bufReq;
+        return lenBufReq;
     }
     else if (n < 0)
         return n;

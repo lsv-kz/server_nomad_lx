@@ -47,7 +47,7 @@
 
 #define     MAX_PATH          2048
 #define     MAX_NAME           256
-#define     LEN_BUF_REQUEST   8192
+#define     SIZE_BUF_REQUEST   8192
 #define     MAX_HEADERS         25
 
 typedef struct fcgi_list_addr {
@@ -176,14 +176,14 @@ public:
     char      remoteAddr[NI_MAXHOST];
     char      remotePort[NI_MAXSERV];
 
-    char      bufReq[LEN_BUF_REQUEST];
-
-    int       i_bufReq;
+    char      bufReq[SIZE_BUF_REQUEST];
+    int       lenBufReq;
     char      *p_newline;
+
     char      *tail;
     int       lenTail;
 
-    char      decodeUri[LEN_BUF_REQUEST];
+    char      decodeUri[SIZE_BUF_REQUEST];
     unsigned int lenDecodeUri;
 
     char      *uri;
@@ -191,11 +191,11 @@ public:
     //------------------------------------------------------------------
     char      *sReqParam;
     char      *sRange;
-    
+
     int       reqMethod;
     int       httpProt;
     int       connKeepAlive;
-    
+
     struct
     {
         int  iConnection;
@@ -210,7 +210,7 @@ public:
         int  iIfRange;
         long long reqContentLength;
     } req_hd;
-    
+
     int  countReqHeaders;
     char  *reqHdName[MAX_HEADERS + 1];
     const char  *reqHdValue[MAX_HEADERS + 1];
@@ -226,7 +226,7 @@ public:
     int       fd;
     off_t offset;
     long long send_bytes;
-    
+
     void init();
     int hd_read();
     int empty_line();
@@ -239,13 +239,13 @@ private:
     Connect *list_end;
 
     std::mutex mtx_thr;
-    
+
     std::condition_variable cond_list;
     std::condition_variable cond_new_thr, cond_exit_thr;
-    
+
     int num_wait_thr, size_list;
     int count_thr, stop_manager;
-    
+
     int NumProc;
     unsigned long all_thr;
 
@@ -265,7 +265,7 @@ public:
     int end_thr(int);
     int wait_create_thr(int*);
     void close_manager();
-    
+
     void print_intr();
 };
 //----------------------------------------------------------------------

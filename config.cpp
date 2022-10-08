@@ -244,8 +244,20 @@ int read_conf_file(const char *path_conf)
     FILE *fconf = fopen(path_conf, "r");
     if (!fconf)
     {
-        create_conf_file(path_conf);
-        fprintf(stderr, " Correct config file: %s\n", path_conf);
+        if (errno == ENOENT)
+        {
+            char s[8];
+            printf("Create config file? [y/n]: ");
+            fflush(stdout);
+            fgets(s, sizeof(s), stdout);
+            if (s[0] == 'y')
+            {
+                create_conf_file(path_conf);
+                fprintf(stderr, " Correct config file: %s\n", path_conf);
+            }
+        }
+        else
+            fprintf(stderr, "<%s:%d> Error fopen(%s): %s\n", __func__, __LINE__, path_conf, strerror(errno));
         return -1;
     }
 
