@@ -180,18 +180,8 @@ int fcgi_(Connect *req, int fcgi_sock, FCGI_client & Fcgi)
             {
                 if (chunk_mode)
                 {
-                    if (req->respStatus >= RS400)
-                    {
-                        send_message(req, NULL, NULL);
-                        return 0;
-                    }
-                    else if (send_response_headers(req, &hdrs) == -1)
+                    if (send_response_headers(req, &hdrs) == -1)
                         return -1;
-        
-                    if (req->respStatus == RS204)
-                    {
-                        return 0;
-                    }
                 }
 
                 chunk.add_arr(p + tail, n - tail);
@@ -263,8 +253,8 @@ int fcgi_send_param(Connect *req, int fcgi_sock)
     
     if (req->scriptType == php_fpm)
     {
-        String s = conf->DocumentRoot;
-        s << req->scriptName;
+        String s;
+        s << conf->DocumentRoot << req->scriptName;
         Fcgi.add("SCRIPT_FILENAME", s.c_str());
     }
 

@@ -64,7 +64,7 @@ void print_help(const char *name)
     fprintf(stderr, "Usage: %s [-l] [-c configfile] [-s signal]\n"
                     "Options:\n"
                     "   -h              : help\n"
-                    "   -l              : print system limits\n"
+                    "   -p              : print parameters\n"
                     "   -c configfile   : default: \"./server.conf\"\n"
                     "   -s signal       : restart, close\n", name);
 }
@@ -134,7 +134,6 @@ void print_config()
     {
         cout << "   [" << i->scrpt_name.c_str() << " : " << i->addr.c_str() << "]\n";
     }
-    
 }
 //======================================================================
 int main(int argc, char *argv[])
@@ -184,6 +183,18 @@ int main(int argc, char *argv[])
 
         if (sig)
         {
+            int sig_send;
+            if (!strcmp(sig, "restart"))
+                sig_send = SIGUSR1;
+            else if (!strcmp(sig, "close"))
+                sig_send = SIGUSR2;
+            else
+            {
+                fprintf(stderr, "<%d> ? option -s: %s\n", __LINE__, sig);
+                print_help(argv[0]);
+                return 1;
+            }
+            
             if (read_conf_file(conf_path.c_str()))
                 return 1;
             pidFile = conf->PidFilePath;
@@ -198,18 +209,13 @@ int main(int argc, char *argv[])
             fscanf(fpid, "%u", &pid_);
             fclose(fpid);
 
-            if (!strcmp(sig, "restart"))
-                kill(pid_, SIGUSR1);
-            else if (!strcmp(sig, "close"))
-                kill(pid_, SIGUSR2);
-            else
+            if (kill(pid_, sig_send))
             {
-                fprintf(stderr, "<%d> ? option -s: %s\n", __LINE__, sig);
-                print_help(argv[0]);
+                fprintf(stderr, "<%d> Error kill(pid=%u, sig=%u): %s\n", __LINE__, pid_, sig_send, strerror(errno));
                 return 1;
             }
 
-            return 01;
+            return 0;
         }
     }
 
@@ -218,73 +224,81 @@ int main(int argc, char *argv[])
         run = 0;
 
         if (read_conf_file(conf_path.c_str()))
-            return 1;
+            break;
 
-        pidFile = conf->PidFilePath;
-        pidFile << "/pid.txt";
-        FILE *fpid = fopen(pidFile.c_str(), "w");
-        if (!fpid)
-        {
-            fprintf(stderr, "<%s:%d> Error open PidFile(%s): %s\n", __func__, __LINE__, pidFile.c_str(), strerror(errno));
-            return 1;
-        }
-
-        fprintf(fpid, "%u\n", getpid());
-        fclose(fpid);
+        set_uid();
 
         sockServer = create_server_socket(conf);
         if (sockServer == -1)
         {
             fprintf(stderr, "<%s:%d> Error: create_server_socket(%s:%s)\n", __func__, __LINE__, 
                         conf->ServerAddr.c_str(), conf->ServerPort.c_str());
-            return 1;
+            break;
         }
 
         Connect::serverSocket = sockServer;
-        
+
         if (start == 0)
         {
             start = 1;
-            set_uid();
+            //----------------------------------------------------------
+            pidFile = conf->PidFilePath;
+            pidFile << "/pid.txt";
+            FILE *fpid = fopen(pidFile.c_str(), "w");
+            if (!fpid)
+            {
+                fprintf(stderr, "<%s:%d> Error open PidFile(%s): %s\n", __func__, __LINE__, pidFile.c_str(), strerror(errno));
+                return 1;
+            }
 
+            fprintf(fpid, "%u\n", getpid());
+            fclose(fpid);
+            //----------------------------------------------------------
             if (signal(SIGINT, signal_handler) == SIG_ERR)
             {
                 fprintf(stderr, "<%s:%d> Error signal(SIGINT): %s\n", __func__, __LINE__, strerror(errno));
-                return 1;
+                break;
             }
 
             if (signal(SIGSEGV, signal_handler) == SIG_ERR)
             {
                 fprintf(stderr, "<%s:%d> Error signal(SIGSEGV): %s\n", __func__, __LINE__, strerror(errno));
-                return 1;
+                break;
             }
 
             if (signal(SIGUSR1, signal_handler) == SIG_ERR)
             {
                 fprintf(stderr, "<%s:%d> Error signal(SIGUSR1): %s\n", __func__, __LINE__, strerror(errno));
-                return 1;
+                break;
             }
 
             if (signal(SIGUSR2, signal_handler) == SIG_ERR)
             {
                 fprintf(stderr, "<%s:%d> Error signal(SIGUSR2): %s\n", __func__, __LINE__, strerror(errno));
-                return 1;
+                break;
             }
         }
-
-        if (main_proc())
+        //--------------------------------------------------------------
+        create_logfiles(conf->LogPath);
+        //--------------------------------------------------------------
+        int ret = main_proc();
+        close_logs();
+        if (ret)
             break;
     }
+
+    if (start == 1)
+        remove(pidFile.c_str());
 
     return 0;
 }
 //======================================================================
 int main_proc()
 {
-    create_logfiles(conf->LogPath);
     pid_t pid = getpid();
     //------------------------------------------------------------------
-    cout << "\n[" << get_time().c_str() << "] - server \"" << conf->ServerSoftware.c_str() << "\" run port: " << conf->ServerPort.c_str() << "\n";
+    cout << "\n[" << get_time().c_str() << "] - server \"" << conf->ServerSoftware.c_str()
+         << "\" run port: " << conf->ServerPort.c_str() << "\n";
     cerr << "   pid="  << pid << "; uid=" << getuid() << "; gid=" << getgid() << "\n";
     cout << "   pid="  << pid << "; uid=" << getuid() << "; gid=" << getgid() << "\n";
     //------------------------------------------------------------------
@@ -322,14 +336,10 @@ int main_proc()
     shutdown(sockServer, SHUT_RDWR);
 
     if (run == 0)
-    {
-        remove(pidFile.c_str());
         fprintf(stderr, "<%s> ***** Close *****\n", __func__);
-    }
     else
         fprintf(stderr, "<%s> ***** Reload *****\n", __func__);
 
-    close_logs();
     return 0;
 }
 //======================================================================

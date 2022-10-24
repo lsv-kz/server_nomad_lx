@@ -247,9 +247,9 @@ int response2(Connect *req)
     {
         if (errno == EACCES)
         {
-			print_err(req, "<%s:%d> Error lstat(\"%s\"): %s\n", __func__, __LINE__, path.c_str(), strerror(errno));
+            print_err(req, "<%s:%d> Error lstat(\"%s\"): %s\n", __func__, __LINE__, path.c_str(), strerror(errno));
             return -RS403;
-		}
+        }
         return fastcgi(req, req->decodeUri);
     }
     else
@@ -290,7 +290,7 @@ int response2(Connect *req)
         }
         //--------------------------------------------------------------
         int len = path.size();
-        path << "/index.html";// line: 249
+        path << "/index.html";
         if ((stat(path.c_str(), &st) != 0) || (conf->index_html != 'y'))
         {
             errno = 0;
@@ -299,7 +299,7 @@ int response2(Connect *req)
             int ret;
             if ((conf->UsePHP != "n") && (conf->index_php == 'y'))
             {
-                path << "/index.php";// line: 249
+                path << "/index.php";
                 if (!stat(path.c_str(), &st))
                 {
                     String s = req->decodeUri;
@@ -350,7 +350,7 @@ int response2(Connect *req)
             else
             {
                 return -RS403;
-			}
+            }
         }
     }
     

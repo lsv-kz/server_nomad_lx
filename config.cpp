@@ -100,9 +100,17 @@ void create_conf_file(const char *path)
 }
 //======================================================================
 static int line_ = 1, line_inc = 0;
+static char bracket = 0;
 //----------------------------------------------------------------------
 int getLine(FILE *f, String &ss)
 {
+    if (bracket)
+    {
+        ss = bracket;
+        bracket = 0;
+        return 1;
+    }
+
     ss = "";
     int ch, len = 0, numWords = 0, wr = 1, wrSpace = 0;
     
@@ -142,7 +150,7 @@ int getLine(FILE *f, String &ss)
         else if ((ch == '{') || (ch == '}'))
         {
             if (len)
-                fseek(f, -1, 1);
+                bracket = (char)ch;
             else
             {
                 ss << (char)ch;
@@ -159,6 +167,7 @@ int getLine(FILE *f, String &ss)
                 ++numWords;
                 wrSpace = 0;
             }
+
             ss << (char)ch;
             ++len;
         }
@@ -186,8 +195,20 @@ int is_bool(const char *s)
     return ((tolower(s[0]) == 'y') || (tolower(s[0]) == 'n'));
 }
 //======================================================================
-int find_bracket(FILE *f)
+int find_bracket(FILE *f, char c)
 {
+    if (bracket)
+    {
+        if (c != bracket)
+        {
+            bracket = 0;
+            return 0;
+        }
+
+        bracket = 0;
+        return 1;
+    }
+
     int ch, grid = 0;
     if (line_inc)
     {
@@ -237,29 +258,9 @@ void create_fcgi_list(fcgi_list_addr **l, const String &s1, const String &s2)
     *l = t;
 }
 //======================================================================
-int read_conf_file(const char *path_conf)
+int read_conf_file(FILE *fconf)
 {
     String ss;
-
-    FILE *fconf = fopen(path_conf, "r");
-    if (!fconf)
-    {
-        if (errno == ENOENT)
-        {
-            char s[8];
-            printf("Create config file? [y/n]: ");
-            fflush(stdout);
-            fgets(s, sizeof(s), stdout);
-            if (s[0] == 'y')
-            {
-                create_conf_file(path_conf);
-                fprintf(stderr, " Correct config file: %s\n", path_conf);
-            }
-        }
-        else
-            fprintf(stderr, "<%s:%d> Error fopen(%s): %s\n", __func__, __LINE__, path_conf, strerror(errno));
-        return -1;
-    }
 
     c.index_html = c.index_php = c.index_pl = c.index_fcgi = 'n';
     c.fcgi_list = NULL;
@@ -347,7 +348,7 @@ int read_conf_file(const char *path_conf)
         {
             if (ss == "index")
             {
-                if (find_bracket(fconf) == 0)
+                if (find_bracket(fconf, '{') == 0)
                 {
                     fprintf(stderr, "<%s:%d> Error not found \"{\", line %d\n", __func__, __LINE__, line_);
                     return -1;
@@ -381,7 +382,7 @@ int read_conf_file(const char *path_conf)
             }
             else if (ss == "fastcgi")
             {
-                if (find_bracket(fconf) == 0)
+                if (find_bracket(fconf, '{') == 0)
                 {
                     fprintf(stderr, "<%s:%d> Error not found \"{\", line %d\n", __func__, __LINE__, line_);
                     return -1;
@@ -480,6 +481,31 @@ int read_conf_file(const char *path_conf)
     //fprintf(stderr, "<%s:%d> max_fd=%d\n", __func__, __LINE__, n);
 
     return 0;
+}
+//======================================================================
+int read_conf_file(const char *path_conf)
+{
+    FILE *fconf = fopen(path_conf, "r");
+    if (!fconf)
+    {
+        if (errno == ENOENT)
+        {
+            char s[8];
+            printf("Create config file? [y/n]: ");
+            fflush(stdout);
+            fgets(s, sizeof(s), stdout);
+            if (s[0] == 'y')
+            {
+                create_conf_file(path_conf);
+                fprintf(stderr, " Correct config file: %s\n", path_conf);
+            }
+        }
+        else
+            fprintf(stderr, "<%s:%d> Error fopen(%s): %s\n", __func__, __LINE__, path_conf, strerror(errno));
+        return -1;
+    }
+    
+    return read_conf_file(fconf);
 }
 //======================================================================
 int set_uid()
